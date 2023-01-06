@@ -83,7 +83,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
     private final Config pluginConfig;
     private final BiConsumer<ClassLoader, URL> addURLToClassLoaderConsumer;
     protected final ConcurrentHashMap<PluginIdentifier, Optional<URL>> pluginJarPath =
-        new ConcurrentHashMap<>(Common.COLLECTION_SIZE);
+            new ConcurrentHashMap<>(Common.COLLECTION_SIZE);
 
     public AbstractPluginDiscovery(String pluginSubDir, BiConsumer<ClassLoader, URL> addURLToClassloader) {
         this(Common.connectorJarDir(pluginSubDir), loadConnectorPluginConfig(), addURLToClassloader);
@@ -112,26 +112,27 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
     }
 
     protected static Config loadConnectorPluginConfig() {
+        log.info("load mapping cfg -> 【{}】", Common.connectorDir().resolve(PLUGIN_MAPPING_FILE));
         return ConfigFactory
-            .parseFile(Common.connectorDir().resolve(PLUGIN_MAPPING_FILE).toFile())
-            .resolve(ConfigResolveOptions.defaults().setAllowUnresolved(true))
-            .resolveWith(ConfigFactory.systemProperties(), ConfigResolveOptions.defaults().setAllowUnresolved(true));
+                .parseFile(Common.connectorDir().resolve(PLUGIN_MAPPING_FILE).toFile())
+                .resolve(ConfigResolveOptions.defaults().setAllowUnresolved(true))
+                .resolveWith(ConfigFactory.systemProperties(), ConfigResolveOptions.defaults().setAllowUnresolved(true));
     }
 
     @Override
     public List<URL> getPluginJarPaths(List<PluginIdentifier> pluginIdentifiers) {
         return pluginIdentifiers.stream()
-            .map(this::getPluginJarPath)
-            .filter(Optional::isPresent)
-            .map(Optional::get).distinct()
-            .collect(Collectors.toList());
+                .map(this::getPluginJarPath)
+                .filter(Optional::isPresent)
+                .map(Optional::get).distinct()
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<T> getAllPlugins(List<PluginIdentifier> pluginIdentifiers) {
         return pluginIdentifiers.stream()
-            .map(this::createPluginInstance).distinct()
-            .collect(Collectors.toList());
+                .map(this::createPluginInstance).distinct()
+                .collect(Collectors.toList());
     }
 
     /**
@@ -150,8 +151,8 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
         if (engineConfig.hasPath(pluginType.getType())) {
             engineConfig.getConfig(pluginType.getType()).entrySet().forEach(entry -> {
                 pluginIdentifiers.put(
-                    PluginIdentifier.of(CollectionConstants.SEATUNNEL_PLUGIN, pluginType.getType(), entry.getKey()),
-                    entry.getValue().unwrapped().toString());
+                        PluginIdentifier.of(CollectionConstants.SEATUNNEL_PLUGIN, pluginType.getType(), entry.getKey()),
+                        entry.getValue().unwrapped().toString());
             });
         }
         return pluginIdentifiers;
@@ -181,7 +182,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
                 }
             } catch (Exception e) {
                 log.warn("can't load jar use current thread classloader, use URLClassLoader instead now." +
-                    " message: " + e.getMessage());
+                        " message: " + e.getMessage());
                 URL[] urls = new URL[pluginJars.size() + 1];
                 int i = 0;
                 for (URL pluginJar : pluginJars) {
@@ -193,7 +194,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
             pluginInstance = loadPluginInstance(pluginIdentifier, classLoader);
             if (pluginInstance != null) {
                 log.info("Load plugin: {} from path: {} use classloader: {}",
-                    pluginIdentifier, pluginJarPath.get(), classLoader.getClass().getName());
+                        pluginIdentifier, pluginJarPath.get(), classLoader.getClass().getName());
                 return pluginInstance;
             }
         }
@@ -202,6 +203,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
 
     /**
      * Get all support plugin already in SEATUNNEL_HOME, only support connector-v2
+     *
      * @return the all plugin identifier of the engine
      */
     @SuppressWarnings("checkstyle:WhitespaceAfter")
@@ -225,11 +227,11 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
                 }
 
                 plugins.get(PluginType.SOURCE).put(PluginIdentifier.of(
-                        "seatunnel",
-                        PluginType.SOURCE.getType(),
-                        plugin.factoryIdentifier()
-                    ),
-                    FactoryUtil.sourceFullOptionRule(plugin));
+                                "seatunnel",
+                                PluginType.SOURCE.getType(),
+                                plugin.factoryIdentifier()
+                        ),
+                        FactoryUtil.sourceFullOptionRule(plugin));
                 return;
             }
 
@@ -239,11 +241,11 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
                 }
 
                 plugins.get(PluginType.SINK).put(PluginIdentifier.of(
-                        "seatunnel",
-                        PluginType.SINK.getType(),
-                        plugin.factoryIdentifier()
-                    ),
-                    plugin.optionRule());
+                                "seatunnel",
+                                PluginType.SINK.getType(),
+                                plugin.factoryIdentifier()
+                        ),
+                        plugin.optionRule());
                 return;
             }
 
@@ -253,11 +255,11 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
                 }
 
                 plugins.get(PluginType.TRANSFORM).put(PluginIdentifier.of(
-                        "seatunnel",
-                        PluginType.TRANSFORM.getType(),
-                        plugin.factoryIdentifier()
-                    ),
-                    plugin.optionRule());
+                                "seatunnel",
+                                PluginType.TRANSFORM.getType(),
+                                plugin.factoryIdentifier()
+                        ),
+                        plugin.optionRule());
                 return;
             }
         });
@@ -278,7 +280,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
                 // new api
                 PluginIdentifierInterface pluginIdentifierInstance = (PluginIdentifierInterface) t;
                 if (StringUtils.equalsIgnoreCase(pluginIdentifierInstance.getPluginName(),
-                    pluginIdentifier.getPluginName())) {
+                        pluginIdentifier.getPluginName())) {
                     return (T) pluginIdentifierInstance;
                 }
             } else {
@@ -327,8 +329,8 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
         }
         Config typeConfig = engineConfig.getConfig(pluginType);
         Optional<Map.Entry<String, ConfigValue>> optional = typeConfig.entrySet().stream()
-            .filter(entry -> StringUtils.equalsIgnoreCase(entry.getKey(), pluginName))
-            .findFirst();
+                .filter(entry -> StringUtils.equalsIgnoreCase(entry.getKey(), pluginName))
+                .findFirst();
         if (!optional.isPresent()) {
             return Optional.empty();
         }
@@ -337,7 +339,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
             @Override
             public boolean accept(File pathname) {
                 return pathname.getName().endsWith(".jar") &&
-                    StringUtils.startsWithIgnoreCase(pathname.getName(), pluginJarPrefix);
+                        StringUtils.startsWithIgnoreCase(pathname.getName(), pluginJarPrefix);
             }
         });
         if (ArrayUtils.isEmpty(targetPluginFiles)) {

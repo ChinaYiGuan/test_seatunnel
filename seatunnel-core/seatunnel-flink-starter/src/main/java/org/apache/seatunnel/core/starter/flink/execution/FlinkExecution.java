@@ -65,8 +65,9 @@ public class FlinkExecution implements TaskExecution {
 
     public FlinkExecution(Config config) {
         try {
+            log.info("load jar -> 【{}】", Common.appStarterDir().resolve(FlinkStarter.APP_JAR_NAME));
             jarPaths = new ArrayList<>(Collections.singletonList(
-                new File(Common.appStarterDir().resolve(FlinkStarter.APP_JAR_NAME).toString()).toURI().toURL()));
+                    new File(Common.appStarterDir().resolve(FlinkStarter.APP_JAR_NAME).toString()).toURI().toURL()));
         } catch (MalformedURLException e) {
             throw new SeaTunnelException("load flink starter error.", e);
         }
@@ -76,7 +77,7 @@ public class FlinkExecution implements TaskExecution {
 
         this.sourcePluginExecuteProcessor = new SourceExecuteProcessor(jarPaths, config.getConfigList(Constants.SOURCE), jobContext);
         this.transformPluginExecuteProcessor = new TransformExecuteProcessor(jarPaths,
-            TypesafeConfigUtils.getConfigList(config, Constants.TRANSFORM, Collections.emptyList()), jobContext);
+                TypesafeConfigUtils.getConfigList(config, Constants.TRANSFORM, Collections.emptyList()), jobContext);
         this.sinkPluginExecuteProcessor = new SinkExecuteProcessor(jarPaths, config.getConfigList(Constants.SINK), jobContext);
 
         this.flinkEnvironment = new FlinkEnvironmentFactory(this.registerPlugin(config, jarPaths)).getEnvironment();
@@ -108,15 +109,15 @@ public class FlinkExecution implements TaskExecution {
         }
         thirdPartyJars.addAll(Common.getPluginsJarDependencies());
         List<URL> jarDependencies = Stream.concat(thirdPartyJars.stream(), Common.getLibJars().stream())
-            .map(Path::toUri)
-            .map(uri -> {
-                try {
-                    return uri.toURL();
-                } catch (MalformedURLException e) {
-                    throw new RuntimeException("the uri of jar illegal:" + uri, e);
-                }
-            })
-            .collect(Collectors.toList());
+                .map(Path::toUri)
+                .map(uri -> {
+                    try {
+                        return uri.toURL();
+                    } catch (MalformedURLException e) {
+                        throw new RuntimeException("the uri of jar illegal:" + uri, e);
+                    }
+                })
+                .collect(Collectors.toList());
         jarDependencies.forEach(url -> FlinkCommon.ADD_URL_TO_CLASSLOADER.accept(Thread.currentThread().getContextClassLoader(), url));
 
         jarPaths.addAll(jarDependencies);
@@ -149,11 +150,11 @@ public class FlinkExecution implements TaskExecution {
             paths.addAll(validJars);
 
             config = config.withValue(path,
-                ConfigValueFactory.fromAnyRef(paths.stream().map(URL::toString).distinct().collect(Collectors.joining(";"))));
+                    ConfigValueFactory.fromAnyRef(paths.stream().map(URL::toString).distinct().collect(Collectors.joining(";"))));
 
         } else {
             config = config.withValue(path,
-                ConfigValueFactory.fromAnyRef(validJars.stream().map(URL::toString).distinct().collect(Collectors.joining(";"))));
+                    ConfigValueFactory.fromAnyRef(validJars.stream().map(URL::toString).distinct().collect(Collectors.joining(";"))));
         }
         return config;
     }
