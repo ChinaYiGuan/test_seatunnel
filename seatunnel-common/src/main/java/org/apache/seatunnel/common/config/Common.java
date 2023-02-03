@@ -17,8 +17,7 @@
 
 package org.apache.seatunnel.common.config;
 
-import static java.nio.file.FileVisitOption.FOLLOW_LINKS;
-
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
@@ -35,6 +34,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.nio.file.FileVisitOption.FOLLOW_LINKS;
+
+@Slf4j
 public class Common {
 
     private Common() {
@@ -150,14 +152,17 @@ public class Common {
      */
     public static List<Path> getLibJars() {
         Path libRootDir = Common.libDir();
+        log.info("find lib jars -> 【{}】. example -> 【{}】", Common.libDir(), String.format("%s/[%s/]xxx.jar", Common.libDir(), "PLUGIN_NAME"));
         if (!Files.exists(libRootDir) || !Files.isDirectory(libRootDir)) {
             return Collections.emptyList();
         }
         try (Stream<Path> stream = Files.walk(libRootDir, APP_LIB_DIR_DEPTH, FOLLOW_LINKS)) {
-            return stream
-                .filter(it -> !it.toFile().isDirectory())
-                .filter(it -> it.getFileName().toString().endsWith(".jar"))
-                .collect(Collectors.toList());
+            List<Path> libJars = stream
+                    .filter(it -> !it.toFile().isDirectory())
+                    .filter(it -> it.getFileName().toString().endsWith(".jar"))
+                    .collect(Collectors.toList());
+            log.info("find lib jars -> 【{}】", libJars);
+            return libJars;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -169,9 +174,9 @@ public class Common {
     public static Set<Path> getThirdPartyJars(String paths) {
 
         return Arrays.stream(paths.split(";"))
-            .filter(s -> !"".equals(s))
-            .filter(it -> it.endsWith(".jar"))
-            .map(path -> Paths.get(URI.create(path))).collect(Collectors.toSet());
+                .filter(s -> !"".equals(s))
+                .filter(it -> it.endsWith(".jar"))
+                .map(path -> Paths.get(URI.create(path))).collect(Collectors.toSet());
     }
 
     public static Path pluginTarball() {
@@ -204,15 +209,18 @@ public class Common {
      */
     public static List<Path> getPluginsJarDependencies() {
         Path pluginRootDir = Common.pluginRootDir();
+        log.info("find plugin dependency jars -> 【{}】. example -> 【{}】", Common.pluginRootDir(), String.format("%s/%s/lib/xxx.jar", Common.pluginRootDir(), "PLUGIN_NAME", "lib"));
         if (!Files.exists(pluginRootDir) || !Files.isDirectory(pluginRootDir)) {
             return Collections.emptyList();
         }
         try (Stream<Path> stream = Files.walk(pluginRootDir, PLUGIN_LIB_DIR_DEPTH, FOLLOW_LINKS)) {
-            return stream
-                .filter(it -> pluginRootDir.relativize(it).getNameCount() == PLUGIN_LIB_DIR_DEPTH)
-                .filter(it -> it.getParent().endsWith("lib"))
-                .filter(it -> it.getFileName().toString().endsWith(".jar"))
-                .collect(Collectors.toList());
+            List<Path> pluginsJars = stream
+                    .filter(it -> pluginRootDir.relativize(it).getNameCount() == PLUGIN_LIB_DIR_DEPTH)
+                    .filter(it -> it.getParent().endsWith("lib"))
+                    .filter(it -> it.getFileName().toString().endsWith(".jar"))
+                    .collect(Collectors.toList());
+            log.info("find plugin dependency jars -> 【{}】", pluginsJars);
+            return pluginsJars;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

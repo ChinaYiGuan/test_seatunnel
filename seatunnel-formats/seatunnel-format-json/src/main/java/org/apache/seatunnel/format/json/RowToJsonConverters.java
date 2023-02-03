@@ -18,22 +18,19 @@
 
 package org.apache.seatunnel.format.json;
 
-import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
-import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-
-import org.apache.seatunnel.api.table.type.ArrayType;
-import org.apache.seatunnel.api.table.type.MapType;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.api.table.type.SqlType;
-import org.apache.seatunnel.common.exception.CommonErrorCode;
-import org.apache.seatunnel.format.json.exception.SeaTunnelJsonFormatException;
-
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.api.table.type.*;
+import org.apache.seatunnel.common.constants.CollectionConstants;
+import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.format.json.exception.SeaTunnelJsonFormatException;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -41,10 +38,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+@Slf4j
 public class RowToJsonConverters implements Serializable {
 
     private static final long serialVersionUID = 6988876688930916940L;
@@ -213,9 +215,24 @@ public class RowToJsonConverters implements Serializable {
                     String fieldName = fieldNames[i];
                     SeaTunnelRow row = (SeaTunnelRow) value;
                     node.set(fieldName, fieldConverters[i].convert(
-                        mapper, node.get(fieldName), row.getField(i)));
+                            mapper, node.get(fieldName), row.getField(i)));
                 }
-
+//                try {
+//                    if (node != null && node.size() == 1 && node.hasNonNull(CollectionConstants.JSON_DATA_KEY) && node.get(CollectionConstants.JSON_DATA_KEY) instanceof TextNode) {
+//                        TextNode textNode = (TextNode)node.get(CollectionConstants.JSON_DATA_KEY);
+//                        node.removeAll();
+//                        JsonNode jsonNode = mapper.readTree(textNode.asText());
+//                        if(jsonNode != null && jsonNode instanceof ArrayNode){
+//                            jsonNode.forEach(x->{
+//                                JsonNode x1 = x;
+//                                System.out.println(x);
+//                            });
+//                        }
+//                        return mapper.createArrayNode();
+//                   }
+//                } catch (Exception e) {
+//                    log.error(e.getMessage());
+//                }
                 return node;
             }
         };

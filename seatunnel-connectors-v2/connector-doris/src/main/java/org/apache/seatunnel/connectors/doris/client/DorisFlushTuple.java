@@ -25,7 +25,8 @@ import java.util.List;
 @AllArgsConstructor
 @Data
 public class DorisFlushTuple {
+    private String tab;
     private String label;
     private Long bytes;
-    private List<byte[]> rows;
+    private List<String> rows;
 }

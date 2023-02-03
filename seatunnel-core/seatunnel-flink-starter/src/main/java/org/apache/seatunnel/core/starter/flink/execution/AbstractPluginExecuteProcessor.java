@@ -20,10 +20,12 @@ package org.apache.seatunnel.core.starter.flink.execution;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
 
 import org.apache.seatunnel.api.common.JobContext;
+import org.apache.seatunnel.api.datasource.BaseDataSource;
 import org.apache.seatunnel.core.starter.flink.config.FlinkCommon;
 import org.apache.seatunnel.flink.FlinkEnvironment;
 import org.apache.seatunnel.flink.util.TableUtil;
 
+import org.apache.seatunnel.plugin.discovery.seatunnel.SeaTunnelDataSourcePluginDiscovery;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -48,9 +50,15 @@ public abstract class AbstractPluginExecuteProcessor<T> implements PluginExecute
     protected final BiConsumer<ClassLoader, URL> addUrlToClassloader = FlinkCommon.ADD_URL_TO_CLASSLOADER;
 
     protected AbstractPluginExecuteProcessor(List<URL> jarPaths, List<? extends Config> pluginConfigs, JobContext jobContext) {
-        this.pluginConfigs = pluginConfigs;
+        this.pluginConfigs = tsf(pluginConfigs);
         this.jobContext = jobContext;
-        this.plugins = initializePlugins(jarPaths, pluginConfigs);
+        this.plugins = initializePlugins(jarPaths, this.pluginConfigs);
+    }
+
+    private List<? extends Config> tsf(List<? extends Config> inputPluginConfigs){
+        SeaTunnelDataSourcePluginDiscovery seaTunnelDataSourcePluginDiscovery = new SeaTunnelDataSourcePluginDiscovery(FlinkCommon.ADD_URL_TO_CLASSLOADER);
+        BaseDataSource baseDataSource = seaTunnelDataSourcePluginDiscovery.discovery(null);
+        return baseDataSource.convertCfgs(inputPluginConfigs);
     }
 
     @Override

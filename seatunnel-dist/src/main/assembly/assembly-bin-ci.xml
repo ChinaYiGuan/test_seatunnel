@@ -148,19 +148,29 @@
             <scope>provided</scope>
         </dependencySet>
 
-        <!-- ============ SeaTunnel Transforms V2 Jars And SeaTunnel Hadoop3 Uber Jar ============  -->
+        <!-- ============ SeaTunnel Transforms Jar ============  -->
         <dependencySet>
             <useProjectArtifact>false</useProjectArtifact>
             <useTransitiveDependencies>true</useTransitiveDependencies>
             <unpack>false</unpack>
             <includes>
                 <include>org.apache.seatunnel:seatunnel-transforms-v2:jar</include>
-                <include>org.apache.hadoop:hadoop-aws:jar</include>
-                <include>com.amazonaws:aws-java-sdk-bundle:jar</include>
-                <include>org.apache.seatunnel:seatunnel-hadoop3-3.1.4-uber:jar</include>
             </includes>
             <outputFileNameMapping>${artifact.file.name}</outputFileNameMapping>
-            <outputDirectory>/lib</outputDirectory>
+            <outputDirectory>/plugins/transform/lib</outputDirectory>
+            <scope>provided</scope>
+        </dependencySet>
+
+        <!-- =================== dataSource plugins Jar ===================  -->
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <useTransitiveDependencies>true</useTransitiveDependencies>
+            <unpack>false</unpack>
+            <includes>
+                <include>org.apache.seatunnel:datasource-*:jar</include>
+            </includes>
+            <outputFileNameMapping>${artifact.file.name}</outputFileNameMapping>
+            <outputDirectory>/plugins/datasource/lib</outputDirectory>
             <scope>provided</scope>
         </dependencySet>
 
@@ -183,8 +193,9 @@
                 <include>com.amazon.redshift:redshift-jdbc42:jar</include>
             </includes>
             <outputFileNameMapping>${artifact.file.name}</outputFileNameMapping>
-            <outputDirectory>/plugins/jdbc/lib</outputDirectory>
+            <outputDirectory>/lib/jdbc_drivers</outputDirectory>
             <scope>provided</scope>
         </dependencySet>
+
     </dependencySets>
 </assembly>

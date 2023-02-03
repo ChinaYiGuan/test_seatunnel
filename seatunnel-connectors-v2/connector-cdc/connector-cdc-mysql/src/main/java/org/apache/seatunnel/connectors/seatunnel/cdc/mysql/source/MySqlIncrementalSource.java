@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.cdc.mysql.source;
 
+import com.google.auto.service.AutoService;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
@@ -35,8 +36,6 @@ import org.apache.seatunnel.connectors.seatunnel.cdc.mysql.config.MySqlSourceCon
 import org.apache.seatunnel.connectors.seatunnel.cdc.mysql.source.offset.BinlogOffsetFactory;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.JdbcCatalogOptions;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.MySqlCatalog;
-
-import com.google.auto.service.AutoService;
 
 import java.time.ZoneId;
 
@@ -62,17 +61,47 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
     public DebeziumDeserializationSchema<T> createDebeziumDeserializationSchema(ReadonlyConfig config) {
         JdbcSourceConfig jdbcSourceConfig = configFactory.create(0);
         String baseUrl = config.get(JdbcCatalogOptions.BASE_URL);
+
         // TODO: support multi-table
         // TODO: support metadata keys
-        MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", jdbcSourceConfig.getDatabaseList().get(0), jdbcSourceConfig.getUsername(), jdbcSourceConfig.getPassword(), baseUrl);
-        CatalogTable table = mySqlCatalog.getTable(TablePath.of(jdbcSourceConfig.getDatabaseList().get(0), config.get(JdbcSourceOptions.TABLE_NAME)));
-        SeaTunnelRowType physicalRowType = table.getTableSchema().toPhysicalRowDataType();
+        SeaTunnelRowType physicalRowType = SeaTunnelRowType.MULTILINE_JSON_TYPE;
         String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
+        if (jdbcSourceConfig.getTableList().size() == 1) {
+            MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", jdbcSourceConfig.getDatabaseList().get(0), jdbcSourceConfig.getUsername(), jdbcSourceConfig.getPassword(), baseUrl);
+            CatalogTable table = mySqlCatalog.getTable(TablePath.of(jdbcSourceConfig.getDatabaseList().get(0), config.get(JdbcSourceOptions.TABLE_NAME)));
+            physicalRowType = table.getTableSchema().toPhysicalRowDataType();
+        }
+
         return (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
-            .setPhysicalRowType(physicalRowType)
-            .setResultTypeInfo(physicalRowType)
-            .setServerTimeZone(ZoneId.of(zoneId))
-            .build();
+                .setPhysicalRowType(physicalRowType)
+                .setResultTypeInfo(physicalRowType)
+                .setServerTimeZone(ZoneId.of(zoneId))
+                .build();
+        /*
+        MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", "", jdbcSourceConfig.getUsername(), jdbcSourceConfig.getPassword(), baseUrl);
+        List<String> dbs = mySqlCatalog.listDatabases().stream()
+                .filter(findDbName -> jdbcSourceConfig.getDatabaseList().stream().anyMatch(dbNamePt -> Pattern.matches(dbNamePt, findDbName)))
+                .collect(Collectors.toList());
+        List<String> tabs = dbs.stream()
+                .flatMap(dbName ->
+                        mySqlCatalog.listTables(dbName).stream()
+                                .map(findTabName -> dbName + "." + findTabName)
+                                .filter(findFullTabName -> jdbcSourceConfig.getTableList().stream().anyMatch(tabNamePt -> Pattern.matches(tabNamePt, findFullTabName)))
+                ).filter(dbTabName -> dbTabName.contains(".") && dbTabName.split("\\.").length == 2)
+                .collect(Collectors.toList());
+
+        return tabs.stream()
+                .map(dbTab -> {
+                    final CatalogTable table = mySqlCatalog.getTable(TablePath.of(dbTab));
+                    final SeaTunnelRowType physicalRowType = table.getTableSchema().toPhysicalRowDataType();
+                    final String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
+                    return Pair.of(Pair.of(dbTab.split("\\.")[0], dbTab.split("\\.")[1]), (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
+                            .setPhysicalRowType(physicalRowType)
+                            .setResultTypeInfo(physicalRowType)
+                            .setServerTimeZone(ZoneId.of(zoneId))
+                            .build());
+                }).collect(LinkedHashMap::new, (m, x) -> m.put(x.getLeft(), x.getRight()), Map::putAll);
+         */
     }
 
     @Override

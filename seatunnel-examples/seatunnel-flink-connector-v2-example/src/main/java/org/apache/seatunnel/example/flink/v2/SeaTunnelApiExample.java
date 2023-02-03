@@ -31,14 +31,21 @@ import java.nio.file.Paths;
 public class SeaTunnelApiExample {
 
     public static void main(String[] args) throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ?  args[0] : "/examples/fake_to_console.conf";
+//        System.setProperty("dataSourceHost", "http://10.192.147.2:12345");
+//        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
+        System.setProperty("dataSourceHost", "http://10.192.147.1:12345");
+        System.setProperty("dataSourceToken", "bf77ef162b00c9d03bc8849ee1d60407");
+        System.setProperty("is_show_parseDs", "all");
+
+        String cfgFile = "/examples/mysqlCDC_to_doris.conf";
+        String configurePath = args.length > 0 ? args[0] : cfgFile;
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setConfigFile(configFile);
         flinkCommandArgs.setCheckConfig(false);
         flinkCommandArgs.setVariables(null);
         Command<FlinkCommandArgs> flinkCommand =
-            new FlinkCommandBuilder().buildCommand(flinkCommandArgs);
+                new FlinkCommandBuilder().buildCommand(flinkCommandArgs);
         Seatunnel.run(flinkCommand);
     }
 

@@ -17,30 +17,35 @@
 
 package org.apache.seatunnel.connectors.doris.client;
 
+import com.google.common.base.Strings;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.common.utils.MultilineJsonFormatUtil;
 import org.apache.seatunnel.connectors.doris.config.SinkConfig;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorErrorCode;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorException;
 
-import com.google.common.base.Strings;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 public class DorisSinkManager {
 
     private final SinkConfig sinkConfig;
-    private final List<byte[]> batchList;
+    //private final List<byte[]> batchList;
+    private final List<MultilineJsonFormatUtil.CvtResp> batchList;
 
     private final DorisStreamLoadVisitor dorisStreamLoadVisitor;
     private ScheduledExecutorService scheduler;
@@ -76,11 +81,14 @@ public class DorisSinkManager {
         }, batchIntervalMs, batchIntervalMs, TimeUnit.MILLISECONDS);
     }
 
-    public synchronized void write(String record) throws IOException {
+    public synchronized void write(String originRecord) throws IOException {
+        MultilineJsonFormatUtil.CvtResp resp = MultilineJsonFormatUtil.read(originRecord, true, false);
         tryInit();
         checkFlushException();
+        String record = resp.getDataJson();
         byte[] bts = record.getBytes(StandardCharsets.UTF_8);
-        batchList.add(bts);
+        //batchList.add(bts);
+        batchList.add(resp);
         batchRowCount++;
         batchBytesSize += bts.length;
         if (batchRowCount >= sinkConfig.getBatchMaxSize() || batchBytesSize >= sinkConfig.getBatchMaxBytes()) {
@@ -102,34 +110,60 @@ public class DorisSinkManager {
         if (batchList.isEmpty()) {
             return;
         }
-        String label = createBatchLabel();
-        DorisFlushTuple tuple = new DorisFlushTuple(label, batchBytesSize, batchList);
-        for (int i = 0; i <= sinkConfig.getMaxRetries(); i++) {
-            try {
-                Boolean successFlag = dorisStreamLoadVisitor.doStreamLoad(tuple);
-                if (successFlag) {
-                    break;
-                }
-            } catch (Exception e) {
-                log.warn("Writing records to Doris failed, retry times = {}", i, e);
-                if (i >= sinkConfig.getMaxRetries()) {
-                    throw new DorisConnectorException(DorisConnectorErrorCode.WRITE_RECORDS_FAILED, "The number of retries was exceeded,writing records to Doris failed.", e);
-                }
+        Map<String, List<MultilineJsonFormatUtil.CvtResp>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(x -> Objects.nonNull(x.getMeta()) && StringUtils.isNotBlank(x.getMeta().getIdentifier()) ? x.getMeta().getIdentifier() : sinkConfig.getTable()));
+        for (Iterator<Map.Entry<String, List<MultilineJsonFormatUtil.CvtResp>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<MultilineJsonFormatUtil.CvtResp>> entry = it.next();
+            String group = entry.getKey();
+            List<MultilineJsonFormatUtil.CvtResp> groupList = entry.getValue();
+            String label = createBatchLabel(group);
+            long groupByteSize = groupList.stream()
+                    .map(x -> Pair.of(x.getDataJson(), x.getMeta()))
+                    .map(Pair::getLeft)
+                    .filter(Objects::nonNull)
+                    .map(x -> x.getBytes(StandardCharsets.UTF_8).length)
+                    .reduce(0, (x0, x1) -> x1 + x1)
+                    .longValue();
 
-                if (e instanceof DorisConnectorException && ((DorisConnectorException) e).needReCreateLabel()) {
-                    String newLabel = createBatchLabel();
-                    log.warn(String.format("Batch label changed from [%s] to [%s]", tuple.getLabel(), newLabel));
-                    tuple.setLabel(newLabel);
-                }
+            List<String> groupBatchList = groupList.stream()
+                    .map(x -> Pair.of(x.getDataJson(), x.getMeta()))
+                    .map(Pair::getLeft)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
 
+            Stream<Pair<String, MultilineJsonFormatUtil.CvtMeta>> pairStream = groupList.stream().map(x -> Pair.of(x.getDataJson(), x.getMeta()));
+            DorisFlushTuple tuple = new DorisFlushTuple(
+                    StringUtils.isNotBlank(sinkConfig.getTable()) ? sinkConfig.getTable() : sinkConfig.getTablePrefix() + StringUtils.substringAfter(group, "."),
+                    label,
+                    groupByteSize,
+                    groupBatchList
+            );
+            for (int i = 0; i <= sinkConfig.getMaxRetries(); i++) {
                 try {
-                    long backoff = Math.min(sinkConfig.getRetryBackoffMultiplierMs() * i,
-                            sinkConfig.getMaxRetryBackoffMs());
-                    Thread.sleep(backoff);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    throw new DorisConnectorException(CommonErrorCode.FLUSH_DATA_FAILED,
-                            "Unable to flush, interrupted while doing another attempt.", e);
+                    Boolean successFlag = dorisStreamLoadVisitor.doStreamLoad(tuple);
+                    if (successFlag) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.warn("Writing records to Doris failed, retry times = {}", i, e);
+                    if (i >= sinkConfig.getMaxRetries()) {
+                        throw new DorisConnectorException(DorisConnectorErrorCode.WRITE_RECORDS_FAILED, "The number of retries was exceeded,writing records to Doris failed.", e);
+                    }
+
+                    if (e instanceof DorisConnectorException && ((DorisConnectorException) e).needReCreateLabel()) {
+                        String newLabel = createBatchLabel(group);
+                        log.warn(String.format("Batch label changed from [%s] to [%s]", tuple.getLabel(), newLabel));
+                        tuple.setLabel(newLabel);
+                    }
+
+                    try {
+                        long backoff = Math.min(sinkConfig.getRetryBackoffMultiplierMs() * i,
+                                sinkConfig.getMaxRetryBackoffMs());
+                        Thread.sleep(backoff);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new DorisConnectorException(CommonErrorCode.FLUSH_DATA_FAILED,
+                                "Unable to flush, interrupted while doing another attempt.", e);
+                    }
                 }
             }
         }
@@ -144,11 +178,23 @@ public class DorisSinkManager {
         }
     }
 
-    public String createBatchLabel() {
+    public String createBatchLabel(String identifier) {
         String labelPrefix = "";
         if (!Strings.isNullOrEmpty(sinkConfig.getLabelPrefix())) {
             labelPrefix = sinkConfig.getLabelPrefix();
         }
-        return String.format("%s%s", labelPrefix, UUID.randomUUID().toString());
+        final int maxLen = 127;
+        final String identifierLab = StringUtils.isNotBlank(sinkConfig.getTablePrefix()) ?
+                String.format("%s-%s%s", sinkConfig.getDatabase(), sinkConfig.getTablePrefix(), StringUtils.substringAfter(identifier, "\\.")) :
+                String.format("%s-%s", sinkConfig.getDatabase(), sinkConfig.getTable());
+        final String lable = StringUtils.strip(
+                String.format("%s-%s-%s-%s",
+                        labelPrefix,
+                        identifierLab,
+                        DateTimeFormatter.ofPattern("yyyyMMddHHssSSS").format(LocalDateTime.now()),
+                        UUID.randomUUID().toString().replaceAll("-", "")
+                ),
+                "-");
+        return lable.length() > maxLen ? lable.substring(0, maxLen + 1) : lable;
     }
 }

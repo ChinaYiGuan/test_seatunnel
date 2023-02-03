@@ -61,6 +61,32 @@ fi
 CLASS_PATH=${APP_DIR}/starter/logging/*:${APP_JAR}
 
 CMD=$(java ${JAVA_OPTS} -cp ${CLASS_PATH} ${APP_MAIN} ${args}) && EXIT_CODE=$? || EXIT_CODE=$?
+###################################### print start cmd begin ######################################
+cmd_input="$0 $@"
+cmd='java ${JAVA_OPTS} -cp ${CLASS_PATH} ${APP_MAIN} ${args}'
+detail="java ${JAVA_OPTS} -cp ${CLASS_PATH} ${APP_MAIN} ${args}"
+JAVA_OPTS="${JAVA_OPTS}"
+CLASS_PATH="${CLASS_PATH}"
+APP_MAIN="${APP_MAIN}"
+args="${args}"
+cmd_rt="$CMD"
+cmd_rt_code="$EXIT_CODE"
+seatunnel_run_info=$(tee<<EOF
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  cmd_input                    -> 【${cmd_input}】
+  cmd                          -> 【${cmd}】
+  detail                       -> 【${detail}】
+  JAVA_OPTS                    -> 【${JAVA_OPTS}】
+  CLASS_PATH                   -> 【${CLASS_PATH}】
+  APP_MAIN                     -> 【${APP_MAIN}】
+  args                         -> 【${args}】
+  cmd_rt                       -> 【${cmd_rt}】
+  cmd_rt_code                  -> 【${cmd_rt_code}】
+EOF
+)
+echo "【`date '+%Y-%m-%d %H:%M:%S'`】 seatunnel-spark-v2 up -> $seatunnel_run_info"
+###################################### print start cmd end ######################################
+
 if [ ${EXIT_CODE} -eq 234 ]; then
     # print usage
     echo "${CMD}"

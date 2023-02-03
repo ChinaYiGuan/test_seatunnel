@@ -70,6 +70,11 @@ public class SinkConfig {
             .noDefaultValue()
             .withDescription("The name of Doris table");
 
+    public static final Option<String> TABLE_PREFIX = Options.key("table.prefix")
+            .stringType()
+            .noDefaultValue()
+            .withDescription("The name of Doris table prefix");
+
     public static final Option<String> DORIS_SINK_CONFIG_PREFIX = Options.key("sink.properties.")
             .stringType()
             .noDefaultValue()
@@ -108,6 +113,7 @@ public class SinkConfig {
 
     public enum StreamLoadFormat {
         CSV, JSON;
+
         public static StreamLoadFormat parse(String format) {
             if (StreamLoadFormat.JSON.name().equals(format)) {
                 return JSON;
@@ -121,6 +127,7 @@ public class SinkConfig {
     private String password;
     private String database;
     private String table;
+    private String tablePrefix;
     private String labelPrefix;
     private String columnSeparator;
     private StreamLoadFormat loadFormat = DEFAULT_LOAD_FORMAT;
@@ -138,7 +145,11 @@ public class SinkConfig {
         SinkConfig sinkConfig = new SinkConfig();
         sinkConfig.setNodeUrls(pluginConfig.getStringList(NODE_URLS.key()));
         sinkConfig.setDatabase(pluginConfig.getString(DATABASE.key()));
-        sinkConfig.setTable(pluginConfig.getString(TABLE.key()));
+        if (pluginConfig.hasPath(TABLE.key())) {
+            sinkConfig.setTable(pluginConfig.getString(TABLE.key()));
+        } else if (pluginConfig.hasPath(TABLE_PREFIX.key())) {
+            sinkConfig.setTablePrefix(pluginConfig.getString(TABLE_PREFIX.key()));
+        }
 
         if (pluginConfig.hasPath(USERNAME.key())) {
             sinkConfig.setUsername(pluginConfig.getString(USERNAME.key()));

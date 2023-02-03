@@ -17,11 +17,8 @@
 
 package org.apache.seatunnel.connectors.cdc.base.source.reader;
 
-import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isLowWatermarkEvent;
-import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isWatermarkEvent;
-import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isDataChangeRecord;
-import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isSchemaChangeEvent;
-
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.Offset;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.OffsetFactory;
@@ -30,12 +27,14 @@ import org.apache.seatunnel.connectors.cdc.base.source.split.state.SourceSplitSt
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.seatunnel.connectors.seatunnel.common.source.reader.RecordEmitter;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.connect.source.SourceRecord;
-
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isLowWatermarkEvent;
+import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isWatermarkEvent;
+import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isDataChangeRecord;
+import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
 /**
  * The {@link RecordEmitter} implementation for {@link IncrementalSourceReader}.
@@ -47,15 +46,15 @@ import java.util.Map;
 public class IncrementalSourceRecordEmitter<T>
         implements RecordEmitter<SourceRecords, T, SourceSplitStateBase> {
 
-    protected final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    protected final DebeziumDeserializationSchema<T> deserializationSchema;
     protected final OutputCollector<T> outputCollector;
 
     protected final OffsetFactory offsetFactory;
 
     public IncrementalSourceRecordEmitter(
-            DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
+            DebeziumDeserializationSchema<T> deserializationSchema,
             OffsetFactory offsetFactory) {
-        this.debeziumDeserializationSchema = debeziumDeserializationSchema;
+        this.deserializationSchema = deserializationSchema;
         this.outputCollector = new OutputCollector<>();
         this.offsetFactory = offsetFactory;
     }
@@ -71,8 +70,8 @@ public class IncrementalSourceRecordEmitter<T>
     }
 
     protected void processElement(
-        SourceRecord element, Collector<T> output, SourceSplitStateBase splitState)
-        throws Exception {
+            SourceRecord element, Collector<T> output, SourceSplitStateBase splitState)
+            throws Exception {
         if (isWatermarkEvent(element)) {
             Offset watermark = getWatermark(element);
             if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
@@ -111,7 +110,18 @@ public class IncrementalSourceRecordEmitter<T>
 
     protected void emitElement(SourceRecord element, Collector<T> output) throws Exception {
         outputCollector.output = output;
-        debeziumDeserializationSchema.deserialize(element, outputCollector);
+        /*
+        if (Objects.nonNull(element) && StringUtils.isNotBlank(element.topic()) && element.topic().split("\\.").length >= 3) {
+            String db = element.topic().split("\\.")[1];
+            String tab = element.topic().split("\\.")[2];
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema = deserializationSchemaMap.get(Pair.of(db, tab));
+            if (Objects.nonNull(debeziumDeserializationSchema)) {
+                debeziumDeserializationSchema.deserialize(element, outputCollector);
+            }
+        } else
+            deserializationSchemaMap.entrySet().stream().findFirst().get().getValue().deserialize(element, outputCollector);
+        */
+        deserializationSchema.deserialize(element, outputCollector);
     }
 
     private static class OutputCollector<T> implements Collector<T> {

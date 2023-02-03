@@ -28,4 +28,8 @@ public class CollectionConstants {
     public static final String TRANSFORM_PLUGIN = "transform";
 
     public static final String SINK_PLUGIN = "sink";
+
+    public static final String JSON_DATA_KEY = "__f_0001";
+
+    public static final String JSON_META_KEY = JSON_DATA_KEY + "_meta";
 }

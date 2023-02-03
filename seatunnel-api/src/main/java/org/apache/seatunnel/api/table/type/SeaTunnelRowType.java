@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.api.table.type;
 
+import org.apache.seatunnel.common.constants.CollectionConstants;
+
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.util.Arrays;
@@ -33,6 +35,8 @@ public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
      * The type of the field.
      */
     private final SeaTunnelDataType<?>[] fieldTypes;
+
+   public static final SeaTunnelRowType MULTILINE_JSON_TYPE = new SeaTunnelRowType(new String[]{CollectionConstants.JSON_DATA_KEY, CollectionConstants.JSON_META_KEY}, new SeaTunnelDataType[]{BasicType.STRING_TYPE, BasicType.STRING_TYPE});
 
     public SeaTunnelRowType(String[] fieldNames, SeaTunnelDataType<?>[] fieldTypes) {
         checkArgument(fieldNames.length == fieldTypes.length,

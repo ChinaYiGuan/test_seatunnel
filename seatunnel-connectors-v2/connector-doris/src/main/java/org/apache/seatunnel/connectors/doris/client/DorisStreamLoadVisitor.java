@@ -17,14 +17,13 @@
 
 package org.apache.seatunnel.connectors.doris.client;
 
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.common.utils.JsonUtils;
 import org.apache.seatunnel.connectors.doris.config.SinkConfig;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorException;
 import org.apache.seatunnel.connectors.doris.util.DelimiterParserUtil;
-
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.binary.Base64;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -63,17 +62,25 @@ public class DorisStreamLoadVisitor {
         if (null == host) {
             throw new DorisConnectorException(CommonErrorCode.ILLEGAL_ARGUMENT, "None of the host in `load_url` could be connected.");
         }
-        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, sinkConfig.getDatabase(), sinkConfig.getTable());
+        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, sinkConfig.getDatabase(), flushData.getTab());
         if (log.isDebugEnabled()) {
             log.debug(String.format("Start to join batch data: rows[%d] bytes[%d] label[%s].", flushData.getRows().size(), flushData.getBytes(), flushData.getLabel()));
         }
-        Map<String, Object> loadResult = httpHelper.doHttpPut(loadUrl, joinRows(flushData.getRows(), flushData.getBytes().intValue()), getStreamLoadHttpHeader(flushData.getLabel()));
+        Map<String, Object> loadResult = httpHelper.doHttpPut(
+                loadUrl,
+                joinRows(
+                        flushData.getRows().stream()
+                                .map(x -> x.getBytes(StandardCharsets.UTF_8))
+                                .collect(Collectors.toList()),
+                        flushData.getBytes().intValue()
+                ),
+                getStreamLoadHttpHeader(flushData.getLabel()));
         final String keyStatus = "Status";
         if (null == loadResult || !loadResult.containsKey(keyStatus)) {
             throw new DorisConnectorException(CommonErrorCode.FLUSH_DATA_FAILED, "Unable to flush data to Doris: unknown result status. " + loadResult);
         }
         if (log.isDebugEnabled()) {
-            log.debug(String.format("StreamLoad response:\n%s"), JsonUtils.toJsonString(loadResult));
+            log.debug(String.format("StreamLoad response:\n%s", JsonUtils.toJsonString(loadResult)));
         }
         if (RESULT_FAILED.equals(loadResult.get(keyStatus))) {
             String errorMsg = "Failed to flush data to Doris.\n";

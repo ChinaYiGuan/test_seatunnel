@@ -17,18 +17,25 @@
 
 package org.apache.seatunnel.connectors.seatunnel.cdc.mysql.config;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import org.apache.seatunnel.connectors.cdc.base.config.JdbcSourceConfigFactory;
-import org.apache.seatunnel.connectors.cdc.debezium.EmbeddedDatabaseHistory;
-
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import org.apache.seatunnel.connectors.cdc.base.config.JdbcSourceConfigFactory;
+import org.apache.seatunnel.connectors.cdc.debezium.EmbeddedDatabaseHistory;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.JdbcCatalogOptions;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.MySqlCatalog;
 
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-/** A factory to initialize {@link MySqlSourceConfig}. */
+import static com.google.common.base.Preconditions.checkNotNull;
+
+/**
+ * A factory to initialize {@link MySqlSourceConfig}.
+ */
 public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private ServerIdRange serverIdRange;
@@ -47,7 +54,9 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         return this;
     }
 
-    /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
+    /**
+     * Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}.
+     */
     public MySqlSourceConfig create(int subtaskId) {
         Properties props = new Properties();
         // hard code server name, because we don't need to distinguish it, docs:
@@ -128,5 +137,27 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize);
+    }
+
+    @Override
+    protected void dbTabRepair(ReadonlyConfig config) {
+        super.dbTabRepair(config);
+        final String baseUrl = config.get(JdbcCatalogOptions.BASE_URL);
+        final MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", "", this.username, this.password, baseUrl);
+        final List<String> dbs = mySqlCatalog.listDatabases().stream()
+                .filter(findDbName -> this.databaseList.stream().anyMatch(dbNamePt -> Pattern.matches(dbNamePt, findDbName)))
+                .distinct()
+                .collect(Collectors.toList());
+
+        final List<String> tabs = dbs.stream()
+                .flatMap(dbName ->
+                        mySqlCatalog.listTables(dbName).stream()
+                                .map(findTabName -> dbName + "." + findTabName)
+                                .filter(findFullTabName -> this.tableList.stream().anyMatch(tabNamePt -> Pattern.matches(tabNamePt, findFullTabName)))
+                ).filter(dbTabName -> dbTabName.contains(".") && dbTabName.split("\\.").length == 2)
+                .distinct()
+                .collect(Collectors.toList());
+        this.databaseList = tabs.stream().map(x -> x.split("\\.")[0]).distinct().collect(Collectors.toList());
+        this.tableList = tabs;
     }
 }

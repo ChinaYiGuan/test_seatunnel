@@ -58,6 +58,6 @@ public class ParallelReaderContext implements SourceReader.Context {
     @Override
     public void sendSourceEventToEnumerator(SourceEvent sourceEvent) {
         // TODO: exception
-        throw new RuntimeException("");
+        //throw new RuntimeException("");
     }
 }

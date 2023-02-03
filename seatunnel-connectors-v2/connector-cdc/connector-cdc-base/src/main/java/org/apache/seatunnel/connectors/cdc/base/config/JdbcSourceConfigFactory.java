@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.cdc.base.config;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.connectors.cdc.base.option.JdbcSourceOptions;
 import org.apache.seatunnel.connectors.cdc.base.option.SourceOptions;
@@ -26,8 +27,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
-/** A {@link SourceConfig.Factory} to provide {@link SourceConfig} of JDBC data source. */
+/**
+ * A {@link SourceConfig.Factory} to provide {@link SourceConfig} of JDBC data source.
+ */
 @SuppressWarnings("checkstyle:MagicNumber")
 public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<JdbcSourceConfig> {
 
@@ -52,13 +56,17 @@ public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<Jd
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
 
-    /** Integer port number of the database server. */
+    /**
+     * Integer port number of the database server.
+     */
     public JdbcSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
         return this;
     }
 
-    /** Integer port number of the database server. */
+    /**
+     * Integer port number of the database server.
+     */
     public JdbcSourceConfigFactory port(int port) {
         this.port = port;
         return this;
@@ -85,13 +93,17 @@ public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<Jd
         return this;
     }
 
-    /** Name of the user to use when connecting to the database server. */
+    /**
+     * Name of the user to use when connecting to the database server.
+     */
     public JdbcSourceConfigFactory username(String username) {
         this.username = username;
         return this;
     }
 
-    /** Password to use when connecting to the database server. */
+    /**
+     * Password to use when connecting to the database server.
+     */
     public JdbcSourceConfigFactory password(String password) {
         this.password = password;
         return this;
@@ -134,7 +146,9 @@ public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<Jd
         return this;
     }
 
-    /** The maximum fetch size for per poll when read table snapshot. */
+    /**
+     * The maximum fetch size for per poll when read table snapshot.
+     */
     public JdbcSourceConfigFactory fetchSize(int fetchSize) {
         this.fetchSize = fetchSize;
         return this;
@@ -149,40 +163,74 @@ public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<Jd
         return this;
     }
 
-    /** The connection pool size. */
+    /**
+     * The connection pool size.
+     */
     public JdbcSourceConfigFactory connectionPoolSize(int connectionPoolSize) {
         this.connectionPoolSize = connectionPoolSize;
         return this;
     }
 
-    /** The max retry times to get connection. */
+    /**
+     * The max retry times to get connection.
+     */
     public JdbcSourceConfigFactory connectMaxRetries(int connectMaxRetries) {
         this.connectMaxRetries = connectMaxRetries;
         return this;
     }
 
-    /** Whether the {@link SourceConfig} should output the schema changes or not. */
+    /**
+     * Whether the {@link SourceConfig} should output the schema changes or not.
+     */
     public JdbcSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
         return this;
     }
 
-    /** The Debezium connector properties. For example, "snapshot.mode". */
+    /**
+     * The Debezium connector properties. For example, "snapshot.mode".
+     */
     public JdbcSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
         return this;
     }
 
-    /** Specifies the startup options. */
+    /**
+     * Specifies the startup options.
+     */
     public JdbcSourceConfigFactory startupOptions(StartupConfig startupConfig) {
         this.startupConfig = startupConfig;
         return this;
     }
 
-    /** Specifies the stop options. */
+    /**
+     * Specifies the stop options.
+     */
     public JdbcSourceConfigFactory stopOptions(StopConfig stopConfig) {
         this.stopConfig = stopConfig;
         return this;
+    }
+
+    protected void dbTabRepair(ReadonlyConfig config) {
+        final String databaseListStr = config.get(JdbcSourceOptions.DATABASE_NAME);
+        if (StringUtils.isBlank(databaseListStr)) {
+            this.databaseList = Collections.singletonList(".*");
+        } else {
+            this.databaseList = Arrays.stream(databaseListStr.trim().split(","))
+                    .map(String::trim)
+                    .distinct()
+                    .collect(Collectors.toList());
+        }
+        final String tableListStr = config.get(JdbcSourceOptions.TABLE_NAME);
+        if (StringUtils.isBlank(tableListStr)) {
+            this.tableList = Collections.singletonList(".*");
+        } else {
+            this.tableList = Arrays.stream(tableListStr.trim().split(","))
+                    .map(String::trim)
+                    .map(x -> x.contains(".") ? x : (this.databaseList.get(0) + "." + x))
+                    .distinct()
+                    .collect(Collectors.toList());
+        }
     }
 
     public JdbcSourceConfigFactory fromReadonlyConfig(ReadonlyConfig config) {
@@ -191,9 +239,9 @@ public abstract class JdbcSourceConfigFactory implements SourceConfig.Factory<Jd
         this.username = config.get(JdbcSourceOptions.USERNAME);
         this.password = config.get(JdbcSourceOptions.PASSWORD);
         // TODO: support multi-table
-        this.databaseList = Collections.singletonList(config.get(JdbcSourceOptions.DATABASE_NAME));
-        this.tableList = Collections.singletonList(config.get(JdbcSourceOptions.DATABASE_NAME)
-            + "." + config.get(JdbcSourceOptions.TABLE_NAME));
+        dbTabRepair(config);
+        // this.databaseList = Collections.singletonList(config.get(JdbcSourceOptions.DATABASE_NAME));
+        // this.tableList = Collections.singletonList(config.get(JdbcSourceOptions.DATABASE_NAME) + "." + config.get(JdbcSourceOptions.TABLE_NAME));
         this.distributionFactorUpper = config.get(JdbcSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         this.distributionFactorLower = config.get(JdbcSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         this.splitSize = config.get(SourceOptions.SNAPSHOT_SPLIT_SIZE);

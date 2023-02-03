@@ -89,6 +89,7 @@
         <module>seatunnel-examples</module>
         <module>seatunnel-e2e</module>
         <module>seatunnel-shade</module>
+        <module>seatunnel-datasource</module>
     </modules>
 
     <profiles>
@@ -165,6 +166,7 @@
         <maven-assembly-plugin.version>3.3.0</maven-assembly-plugin.version>
         <commons-compress.version>1.20</commons-compress.version>
         <protostuff.version>1.8.0</protostuff.version>
+        <fastjson2.version>2.0.23</fastjson2.version>
         <spark.scope>provided</spark.scope>
         <flink.scope>provided</flink.scope>
         <codec.version>1.13</codec.version>
@@ -502,6 +504,14 @@
                 <classifier>optional</classifier>
                 <scope>provided</scope>
             </dependency>
+
+            <!-- mvn repository deps -->
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
+            <!-- mvn repository deps -->
 
         </dependencies>
 

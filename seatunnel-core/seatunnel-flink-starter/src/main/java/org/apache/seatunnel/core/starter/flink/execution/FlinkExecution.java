@@ -17,6 +17,9 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import lombok.extern.slf4j.Slf4j;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.env.EnvCommonOptions;
 import org.apache.seatunnel.common.Constants;
@@ -29,24 +32,16 @@ import org.apache.seatunnel.core.starter.flink.FlinkStarter;
 import org.apache.seatunnel.core.starter.flink.config.FlinkCommon;
 import org.apache.seatunnel.core.starter.flink.config.FlinkEnvironmentFactory;
 import org.apache.seatunnel.flink.FlinkEnvironment;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
+import org.apache.seatunnel.shade.com.typesafe.config.ConfigRenderOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValueFactory;
-
-import lombok.extern.slf4j.Slf4j;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.types.Row;
 
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -65,9 +60,9 @@ public class FlinkExecution implements TaskExecution {
 
     public FlinkExecution(Config config) {
         try {
-            log.info("load jar -> 【{}】", Common.appStarterDir().resolve(FlinkStarter.APP_JAR_NAME));
             jarPaths = new ArrayList<>(Collections.singletonList(
                     new File(Common.appStarterDir().resolve(FlinkStarter.APP_JAR_NAME).toString()).toURI().toURL()));
+            log.info("find main jar -> 【{}】", jarPaths);
         } catch (MalformedURLException e) {
             throw new SeaTunnelException("load flink starter error.", e);
         }
@@ -104,8 +99,10 @@ public class FlinkExecution implements TaskExecution {
 
     private void registerPlugin(Config envConfig) {
         List<Path> thirdPartyJars = new ArrayList<>();
+        log.info("find thirdPartyJars jar path for config. example:【{}】", "env{jars='/var/xxx1.jar;/var/xxx2.jar'}");
         if (envConfig.hasPath(EnvCommonOptions.JARS.key())) {
             thirdPartyJars = new ArrayList<>(Common.getThirdPartyJars(envConfig.getString(EnvCommonOptions.JARS.key())));
+            log.info("find thirdPartyJars jar -> 【{}】", thirdPartyJars);
         }
         thirdPartyJars.addAll(Common.getPluginsJarDependencies());
         List<URL> jarDependencies = Stream.concat(thirdPartyJars.stream(), Common.getLibJars().stream())
@@ -125,7 +122,9 @@ public class FlinkExecution implements TaskExecution {
 
     private Config registerPlugin(Config config, List<URL> jars) {
         config = this.injectJarsToConfig(config, ConfigUtil.joinPath("env", "pipeline", "jars"), jars);
-        return this.injectJarsToConfig(config, ConfigUtil.joinPath("env", "pipeline", "classpaths"), jars);
+        config = this.injectJarsToConfig(config, ConfigUtil.joinPath("env", "pipeline", "classpaths"), jars);
+        log.debug("show final config file: {}", config.root().render(ConfigRenderOptions.concise().setFormatted(true)));
+        return config;
     }
 
     private Config injectJarsToConfig(Config config, String path, List<URL> jars) {
@@ -133,7 +132,7 @@ public class FlinkExecution implements TaskExecution {
         for (URL jarUrl : jars) {
             if (new File(jarUrl.getFile()).exists()) {
                 validJars.add(jarUrl);
-                log.info("Inject jar to config: {}", jarUrl);
+                log.info("Inject jar to config: {}. path:{}", jarUrl, path);
             } else {
                 log.warn("Remove invalid jar when inject jars into config: {}", jarUrl);
             }

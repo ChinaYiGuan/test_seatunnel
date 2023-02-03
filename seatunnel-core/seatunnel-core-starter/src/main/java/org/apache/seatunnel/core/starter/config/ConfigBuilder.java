@@ -17,14 +17,12 @@
 
 package org.apache.seatunnel.core.starter.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.common.config.ConfigRuntimeException;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigRenderOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigResolveOptions;
-
-import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
 
@@ -54,10 +52,10 @@ public class ConfigBuilder {
         // variables substitution / variables resolution order:
         // config file --> system environment --> java properties
         Config config = ConfigFactory
-            .parseFile(configFile.toFile())
-            .resolve(ConfigResolveOptions.defaults().setAllowUnresolved(true))
-            .resolveWith(ConfigFactory.systemProperties(),
-                ConfigResolveOptions.defaults().setAllowUnresolved(true));
+                .parseFile(configFile.toFile())
+                .resolve(ConfigResolveOptions.defaults().setAllowUnresolved(true))
+                .resolveWith(ConfigFactory.systemProperties(),
+                        ConfigResolveOptions.defaults().setAllowUnresolved(true));
 
         ConfigRenderOptions options = ConfigRenderOptions.concise().setFormatted(true);
         log.info("parsed config file: {}", config.root().render(options));

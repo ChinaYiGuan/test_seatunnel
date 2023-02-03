@@ -17,32 +17,25 @@
 
 package org.apache.seatunnel.plugin.discovery;
 
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.PluginIdentifierInterface;
 import org.apache.seatunnel.api.configuration.util.OptionRule;
-import org.apache.seatunnel.api.table.factory.Factory;
-import org.apache.seatunnel.api.table.factory.FactoryUtil;
-import org.apache.seatunnel.api.table.factory.TableSinkFactory;
-import org.apache.seatunnel.api.table.factory.TableSourceFactory;
-import org.apache.seatunnel.api.table.factory.TableTransformFactory;
+import org.apache.seatunnel.api.table.factory.*;
 import org.apache.seatunnel.apis.base.plugin.Plugin;
 import org.apache.seatunnel.common.config.Common;
 import org.apache.seatunnel.common.constants.CollectionConstants;
 import org.apache.seatunnel.common.constants.PluginType;
 import org.apache.seatunnel.common.utils.FileUtils;
 import org.apache.seatunnel.common.utils.ReflectionUtils;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigResolveOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValue;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -50,14 +43,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -108,11 +94,11 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
         this.pluginDir = pluginDir;
         this.pluginConfig = pluginConfig;
         this.addURLToClassLoaderConsumer = addURLToClassLoaderConsumer;
-        log.info("Load {} Plugin from {}", getPluginBaseClass().getSimpleName(), pluginDir);
+        log.info("Discovery {} Plugin from {}", getPluginBaseClass().getSimpleName(), pluginDir);
     }
 
     protected static Config loadConnectorPluginConfig() {
-        log.info("load mapping cfg -> 【{}】", Common.connectorDir().resolve(PLUGIN_MAPPING_FILE));
+        log.info("find and load mapping cfg -> 【{}】", Common.connectorDir().resolve(PLUGIN_MAPPING_FILE));
         return ConfigFactory
                 .parseFile(Common.connectorDir().resolve(PLUGIN_MAPPING_FILE).toFile())
                 .resolve(ConfigResolveOptions.defaults().setAllowUnresolved(true))
@@ -166,9 +152,10 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
     @Override
     public T createPluginInstance(PluginIdentifier pluginIdentifier, Collection<URL> pluginJars) {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        T pluginInstance = loadPluginInstance(pluginIdentifier, classLoader);
+        T pluginInstance = null;
+        pluginInstance = loadPluginInstance(pluginIdentifier, classLoader);
         if (pluginInstance != null) {
-            log.info("Load plugin: {} from classpath", pluginIdentifier);
+            log.info("Load plugin: {} from classpath. use classloader: {}", pluginIdentifier, pluginInstance.getClass().getClassLoader());
             return pluginInstance;
         }
         Optional<URL> pluginJarPath = getPluginJarPath(pluginIdentifier);
@@ -193,8 +180,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
             }
             pluginInstance = loadPluginInstance(pluginIdentifier, classLoader);
             if (pluginInstance != null) {
-                log.info("Load plugin: {} from path: {} use classloader: {}",
-                        pluginIdentifier, pluginJarPath.get(), classLoader.getClass().getName());
+                log.info("Load plugin: {} from path: {} use classloader: {}", pluginIdentifier, pluginJarPath.get(), pluginInstance.getClass().getClassLoader());
                 return pluginInstance;
             }
         }
@@ -269,9 +255,10 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
     @Nullable
     private T loadPluginInstance(PluginIdentifier pluginIdentifier, ClassLoader classLoader) {
         ServiceLoader<T> serviceLoader = ServiceLoader.load(getPluginBaseClass(), classLoader);
+        log.info("instantiate plugin:【{}】, classLoader:【{}】", pluginIdentifier.getPluginName(), classLoader);
         for (T t : serviceLoader) {
             if (t instanceof Plugin) {
-                // old api
+                // old api0
                 Plugin<?> pluginInstance = (Plugin<?>) t;
                 if (StringUtils.equalsIgnoreCase(pluginInstance.getPluginName(), pluginIdentifier.getPluginName())) {
                     return (T) pluginInstance;
@@ -335,6 +322,9 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
             return Optional.empty();
         }
         String pluginJarPrefix = optional.get().getValue().unwrapped().toString();
+        log.info("find plugin app jar -> 【{}】. cfg key:【{}】",
+                String.format("%s/%sxxxx.jar", pluginDir, pluginJarPrefix),
+                String.format("%s.%s.%s", pluginIdentifier.getEngineType(), pluginIdentifier.getPluginType(), pluginIdentifier.getPluginName()));
         File[] targetPluginFiles = pluginDir.toFile().listFiles(new FileFilter() {
             @Override
             public boolean accept(File pathname) {
@@ -354,4 +344,5 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
             return Optional.empty();
         }
     }
+
 }

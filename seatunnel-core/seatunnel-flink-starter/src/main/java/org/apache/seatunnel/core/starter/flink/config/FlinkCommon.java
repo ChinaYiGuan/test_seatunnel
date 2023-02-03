@@ -17,12 +17,14 @@
 
 package org.apache.seatunnel.core.starter.flink.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.common.utils.ReflectionUtils;
 
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.function.BiConsumer;
 
+@Slf4j
 public class FlinkCommon {
 
     /**
@@ -30,6 +32,7 @@ public class FlinkCommon {
      * their own classloader
      */
     public static BiConsumer<ClassLoader, URL> ADD_URL_TO_CLASSLOADER = (classLoader, url) -> {
+        log.info("load jar -> 【{}】, use classloader -> 【{}】", url, classLoader);
         if (classLoader.getClass().getName().endsWith("SafetyNetWrapperClassLoader")) {
             URLClassLoader c = (URLClassLoader) ReflectionUtils.getField(classLoader, "inner").get();
             ReflectionUtils.invoke(c, "addURL", url);
@@ -39,4 +42,5 @@ public class FlinkCommon {
             throw new RuntimeException("Unsupported classloader: " + classLoader.getClass().getName());
         }
     };
+
 }
