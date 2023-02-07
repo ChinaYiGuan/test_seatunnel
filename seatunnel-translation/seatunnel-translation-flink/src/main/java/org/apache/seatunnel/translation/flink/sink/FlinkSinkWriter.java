@@ -29,6 +29,7 @@ import java.io.InvalidClassException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<InputT, CommitWrapper<CommT>, FlinkWriterState<WriterStateT>> {
@@ -43,6 +44,14 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
         this.sinkWriter = sinkWriter;
         this.checkpointId = checkpointId;
         this.rowSerialization = new FlinkRowConverter(dataType);
+    }
+
+    FlinkSinkWriter(org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter,
+                    long checkpointId,
+                    SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> getConsumedTypeFunction) {
+        this.sinkWriter = sinkWriter;
+        this.checkpointId = checkpointId;
+        this.rowSerialization = new FlinkRowConverter(dataType,getConsumedTypeFunction);
     }
 
     @Override

@@ -17,18 +17,19 @@
 
 package org.apache.seatunnel.translation.flink.sink;
 
-import org.apache.seatunnel.api.sink.DefaultSinkWriterContext;
-import org.apache.seatunnel.api.sink.SeaTunnelSink;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.translation.flink.serialization.CommitWrapperSerializer;
-import org.apache.seatunnel.translation.flink.serialization.FlinkSimpleVersionedSerializer;
-import org.apache.seatunnel.translation.flink.serialization.FlinkWriterStateSerializer;
-
 import org.apache.flink.api.connector.sink.Committer;
 import org.apache.flink.api.connector.sink.GlobalCommitter;
 import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.seatunnel.api.common.DynamicRowType;
+import org.apache.seatunnel.api.sink.DefaultSinkWriterContext;
+import org.apache.seatunnel.api.sink.SeaTunnelSink;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.translation.flink.serialization.CommitWrapperSerializer;
+import org.apache.seatunnel.translation.flink.serialization.FlinkSimpleVersionedSerializer;
+import org.apache.seatunnel.translation.flink.serialization.FlinkWriterStateSerializer;
 
 import java.io.IOException;
 import java.util.List;
@@ -49,10 +50,20 @@ public class FlinkSink<InputT, CommT, WriterStateT, GlobalCommT> implements Sink
         org.apache.seatunnel.api.sink.SinkWriter.Context stContext = new DefaultSinkWriterContext(context.getSubtaskId());
 
         if (states == null || states.isEmpty()) {
-            return new FlinkSinkWriter<>(sink.createWriter(stContext), 1, sink.getConsumedType());
+            if (sink instanceof DynamicRowType) {
+                DynamicRowType dynamicRowType = (DynamicRowType) sink;
+                return new FlinkSinkWriter<>(sink.createWriter(stContext), 1, SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE, dynamicRowType::getDynamicRowType);
+            } else {
+                return new FlinkSinkWriter<>(sink.createWriter(stContext), 1, sink.getConsumedType());
+            }
         } else {
             List<WriterStateT> restoredState = states.stream().map(FlinkWriterState::getState).collect(Collectors.toList());
-            return new FlinkSinkWriter<>(sink.restoreWriter(stContext, restoredState), states.get(0).getCheckpointId(), sink.getConsumedType());
+            if (sink instanceof DynamicRowType) {
+                DynamicRowType dynamicRowType = (DynamicRowType) sink;
+                return new FlinkSinkWriter<>(sink.restoreWriter(stContext, restoredState), states.get(0).getCheckpointId(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE, dynamicRowType::getDynamicRowType);
+            } else {
+                return new FlinkSinkWriter<>(sink.restoreWriter(stContext, restoredState), states.get(0).getCheckpointId(), sink.getConsumedType());
+            }
         }
     }
 

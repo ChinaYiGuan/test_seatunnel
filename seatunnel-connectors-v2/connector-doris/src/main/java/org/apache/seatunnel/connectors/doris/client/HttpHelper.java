@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.doris.client;
 
+import org.apache.http.client.methods.HttpPost;
 import org.apache.seatunnel.common.utils.JsonUtils;
 
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ import org.apache.http.util.EntityUtils;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -67,7 +69,7 @@ public class HttpHelper {
                     log.warn("Request failed with empty response.");
                     return null;
                 }
-                return EntityUtils.toString(respEntity);
+                return EntityUtils.toString(respEntity, StandardCharsets.UTF_8);
             }
         }
     }
@@ -87,7 +89,7 @@ public class HttpHelper {
                     log.warn("Request failed with empty response.");
                     return null;
                 }
-                return JsonUtils.parseObject(EntityUtils.toString(respEntity), Map.class);
+                return JsonUtils.parseObject(EntityUtils.toString(respEntity, StandardCharsets.UTF_8), Map.class);
             }
         }
     }
@@ -116,7 +118,7 @@ public class HttpHelper {
                     String errorText;
                     try {
                         HttpEntity respEntity = resp.getEntity();
-                        errorText = EntityUtils.toString(respEntity);
+                        errorText = EntityUtils.toString(respEntity, StandardCharsets.UTF_8);
                     } catch (Exception err) {
                         errorText = "find errorText failed: " + err.getMessage();
                     }
@@ -131,10 +133,54 @@ public class HttpHelper {
                     log.warn("Request failed with empty response.");
                     return null;
                 }
-                return JsonUtils.parseObject(EntityUtils.toString(respEntity), Map.class);
+                return JsonUtils.parseObject(EntityUtils.toString(respEntity, StandardCharsets.UTF_8), Map.class);
             }
         }
     }
+
+    public Map<String, Object> doHttpPost(String url, byte[] data, Map<String, String> header) throws IOException {
+        final HttpClientBuilder httpClientBuilder = HttpClients.custom()
+                .setRedirectStrategy(new DefaultRedirectStrategy() {
+                    @Override
+                    protected boolean isRedirectable(String method) {
+                        return true;
+                    }
+                });
+        try (CloseableHttpClient httpclient = httpClientBuilder.build()) {
+            HttpPost httpPost = new HttpPost(url);
+            if (null != header) {
+                for (Map.Entry<String, String> entry : header.entrySet()) {
+                    httpPost.setHeader(entry.getKey(), String.valueOf(entry.getValue()));
+                }
+            }
+            httpPost.setEntity(new ByteArrayEntity(data));
+            httpPost.setConfig(RequestConfig.custom().setRedirectsEnabled(true).build());
+            try (CloseableHttpResponse resp = httpclient.execute(httpPost)) {
+                int code = resp.getStatusLine().getStatusCode();
+                if (HttpStatus.SC_OK != code) {
+                    String errorText;
+                    try {
+                        HttpEntity respEntity = resp.getEntity();
+                        errorText = EntityUtils.toString(respEntity, StandardCharsets.UTF_8);
+                    } catch (Exception err) {
+                        errorText = "find errorText failed: " + err.getMessage();
+                    }
+                    log.warn("Request failed with code:{}, err:{}", code, errorText);
+                    Map<String, Object> errorMap = new HashMap<>();
+                    errorMap.put("Status", "Fail");
+                    errorMap.put("Message", errorText);
+                    return errorMap;
+                }
+                HttpEntity respEntity = resp.getEntity();
+                if (null == respEntity) {
+                    log.warn("Request failed with empty response.");
+                    return null;
+                }
+                return JsonUtils.parseObject(EntityUtils.toString(respEntity, StandardCharsets.UTF_8), Map.class);
+            }
+        }
+    }
+
 
     private CloseableHttpClient buildHttpClient() {
         final HttpClientBuilder httpClientBuilder = HttpClients.custom()

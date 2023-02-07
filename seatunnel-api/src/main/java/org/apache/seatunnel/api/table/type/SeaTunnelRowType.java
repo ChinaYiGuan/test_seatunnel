@@ -36,7 +36,7 @@ public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
      */
     private final SeaTunnelDataType<?>[] fieldTypes;
 
-   public static final SeaTunnelRowType MULTILINE_JSON_TYPE = new SeaTunnelRowType(new String[]{CollectionConstants.JSON_DATA_KEY, CollectionConstants.JSON_META_KEY}, new SeaTunnelDataType[]{BasicType.STRING_TYPE, BasicType.STRING_TYPE});
+   public static final SeaTunnelRowType DYNAMIC_TSF_ROW_TYPE = new SeaTunnelRowType(new String[]{CollectionConstants.JSON_DATA_KEY, CollectionConstants.JSON_META_KEY}, new SeaTunnelDataType[]{BasicType.STRING_TYPE, BasicType.STRING_TYPE});
 
     public SeaTunnelRowType(String[] fieldNames, SeaTunnelDataType<?>[] fieldTypes) {
         checkArgument(fieldNames.length == fieldTypes.length,

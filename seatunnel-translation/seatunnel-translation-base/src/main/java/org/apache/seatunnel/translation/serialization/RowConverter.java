@@ -17,16 +17,18 @@
 
 package org.apache.seatunnel.translation.serialization;
 
-import org.apache.seatunnel.api.table.type.MapType;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.api.table.type.SqlType;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.api.table.type.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Conversion between {@link SeaTunnelRow} & engine's row.
@@ -34,15 +36,44 @@ import java.util.Map;
  * @param <T> engine row
  */
 public abstract class RowConverter<T> {
+
     protected final SeaTunnelDataType<?> dataType;
+
+    private static final Cache<String, SeaTunnelRowType> DYNAMIC_ROW_TYPE_CACHE = CacheBuilder.newBuilder()
+            .concurrencyLevel(4) // 并发级别
+            .initialCapacity(100)// 初始化容量
+            .expireAfterWrite(5, TimeUnit.DAYS)//失效时间
+            .maximumSize(10000)//最大容量
+            .build();
+
+    protected Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction;
 
     public RowConverter(SeaTunnelDataType<?> dataType) {
         this.dataType = dataType;
     }
 
+    public RowConverter(SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
+        this.dataType = dataType;
+        this.dynamicRowTypeFunction = dynamicRowTypeFunction;
+    }
+
+    protected SeaTunnelRowType getDynamicRowType(String identifier) {
+        SeaTunnelRowType dynamicRowType = DYNAMIC_ROW_TYPE_CACHE.getIfPresent(identifier);
+        if (Objects.nonNull(dynamicRowType)) {
+            return dynamicRowType;
+        } else {
+            dynamicRowType = (SeaTunnelRowType) dynamicRowTypeFunction.apply(identifier);
+        }
+        return dynamicRowType;
+    }
+
+
     public void validate(SeaTunnelRow seaTunnelRow) throws IOException {
         if (!(dataType instanceof SeaTunnelRowType)) {
             throw new UnsupportedOperationException(String.format("The data type don't support validation: %s. ", dataType.getClass().getSimpleName()));
+        }
+        if (StringUtils.isNotBlank(seaTunnelRow.getIdentifier())) {
+            return;
         }
         SeaTunnelDataType<?>[] fieldTypes = ((SeaTunnelRowType) dataType).getFieldTypes();
         List<String> errors = new ArrayList<>();
@@ -53,7 +84,7 @@ public abstract class RowConverter<T> {
             fieldType = fieldTypes[i];
             if (!validate(field, fieldType)) {
                 errors.add(String.format("The SQL type '%s' don't support '%s', the class of the expected data type is '%s'.",
-                    fieldType.getSqlType(), field.getClass(), fieldType.getTypeClass()));
+                        fieldType.getSqlType(), field.getClass(), fieldType.getTypeClass()));
             }
         }
         if (errors.size() > 0) {
@@ -93,7 +124,7 @@ public abstract class RowConverter<T> {
                 } else {
                     Map.Entry<?, ?> entry = mapField.entrySet().stream().findFirst().get();
                     return validate(entry.getKey(), mapType.getKeyType())
-                        && validate(entry.getValue(), mapType.getValueType());
+                            && validate(entry.getValue(), mapType.getValueType());
                 }
             case ROW:
                 if (!(field instanceof SeaTunnelRow)) {

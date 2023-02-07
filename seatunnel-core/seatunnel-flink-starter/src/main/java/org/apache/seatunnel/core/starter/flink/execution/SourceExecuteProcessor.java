@@ -19,10 +19,12 @@ package org.apache.seatunnel.core.starter.flink.execution;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
+import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.source.SourceCommonOptions;
 import org.apache.seatunnel.api.source.SupportCoordinate;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.constants.JobMode;
 import org.apache.seatunnel.plugin.discovery.PluginIdentifier;
 import org.apache.seatunnel.plugin.discovery.seatunnel.SeaTunnelSourcePluginDiscovery;
@@ -41,6 +43,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.apache.flink.streaming.api.operators.StreamSource;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.translation.flink.utils.TypeConverterUtils;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -93,6 +96,10 @@ public class SourceExecuteProcessor extends AbstractPluginExecuteProcessor<SeaTu
         checkNotNull(bounded);
 
         TypeInformation<Row> resolvedTypeInfo = function.getProducedType();
+        if(function.getSource() instanceof DynamicRowType){
+            resolvedTypeInfo = (TypeInformation<Row>)TypeConverterUtils.convert(SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE);
+        }
+
 
         boolean isParallel = function instanceof ParallelSourceFunction;
 

@@ -55,6 +55,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import io.debezium.relational.TableId;
 
+import javax.crypto.MacSpi;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,7 +77,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig> implements Se
     protected StopConfig stopConfig;
 
     protected StopMode stopMode;
-    protected DebeziumDeserializationSchema<T> deserializationSchema;
+    protected Map<String,DebeziumDeserializationSchema<T>> deserializationSchemaMap;
 
     @Override
     public final void prepare(Config pluginConfig) throws PrepareFailException {
@@ -88,7 +89,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig> implements Se
         this.incrementalParallelism = readonlyConfig.get(SourceOptions.INCREMENTAL_PARALLELISM);
         this.configFactory = createSourceConfigFactory(readonlyConfig);
         this.dataSourceDialect = createDataSourceDialect(readonlyConfig);
-        this.deserializationSchema = createDebeziumDeserializationSchema(readonlyConfig);
+        this.deserializationSchemaMap = createDebeziumDeserializationSchemaMap(readonlyConfig);
         this.offsetFactory = createOffsetFactory(readonlyConfig);
     }
 
@@ -110,7 +111,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig> implements Se
 
     public abstract SourceConfig.Factory<C> createSourceConfigFactory(ReadonlyConfig config);
 
-    public abstract DebeziumDeserializationSchema<T> createDebeziumDeserializationSchema(ReadonlyConfig config);
+    public abstract Map<String,DebeziumDeserializationSchema<T>> createDebeziumDeserializationSchemaMap(ReadonlyConfig config);
 
     public abstract DataSourceDialect<C> createDataSourceDialect(ReadonlyConfig config);
 
@@ -123,7 +124,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig> implements Se
 
     @Override
     public SeaTunnelDataType<T> getProducedType() {
-        return deserializationSchema.getProducedType();
+        return deserializationSchemaMap.entrySet().stream().findFirst().get().getValue().getProducedType();
     }
 
     @SuppressWarnings("MagicNumber")
@@ -148,7 +149,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig> implements Se
     protected RecordEmitter<SourceRecords, T, SourceSplitStateBase> createRecordEmitter(
             SourceConfig sourceConfig) {
         return new IncrementalSourceRecordEmitter<>(
-                deserializationSchema,
+                deserializationSchemaMap,
                 offsetFactory);
     }
 

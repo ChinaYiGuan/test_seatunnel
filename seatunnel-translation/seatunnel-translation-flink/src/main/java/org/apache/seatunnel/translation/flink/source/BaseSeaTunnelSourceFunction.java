@@ -17,11 +17,6 @@
 
 package org.apache.seatunnel.translation.flink.source;
 
-import org.apache.seatunnel.api.source.SeaTunnelSource;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.translation.flink.utils.TypeConverterUtils;
-import org.apache.seatunnel.translation.source.BaseSourceFunction;
-
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -38,6 +33,12 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.api.common.DynamicRowType;
+import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.translation.flink.utils.TypeConverterUtils;
+import org.apache.seatunnel.translation.source.BaseSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +48,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row>
-    implements CheckpointListener, ResultTypeQueryable<Row>, CheckpointedFunction {
+        implements CheckpointListener, ResultTypeQueryable<Row>, CheckpointedFunction {
     private static final Logger LOG = LoggerFactory.getLogger(BaseSeaTunnelSourceFunction.class);
 
     protected final SeaTunnelSource<SeaTunnelRow, ?, ?> source;
@@ -80,7 +81,12 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
     public void run(SourceFunction.SourceContext<Row> sourceContext) throws Exception {
-        internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), source.getProducedType()));
+        if (source instanceof DynamicRowType) {
+            DynamicRowType<?> dynamicRowType = (DynamicRowType<?>) source;
+            internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE, dynamicRowType::getDynamicRowType));
+        } else {
+            internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), source.getProducedType()));
+        }
         // Wait for a checkpoint to complete:
         // In the current version(version < 1.14.0), when the operator state of the source changes to FINISHED, jobs cannot be checkpoint executed.
         final long prevCheckpointId = latestTriggerCheckpointId.get();
@@ -143,13 +149,13 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @Override
     public void initializeState(FunctionInitializationContext initializeContext) throws Exception {
         this.sourceState = initializeContext.getOperatorStateStore()
-            .getListState(
-                new ListStateDescriptor<>(
-                    getStateName(),
-                    Types.MAP(
-                        BasicTypeInfo.INT_TYPE_INFO,
-                        Types.LIST(PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO))
-                ));
+                .getListState(
+                        new ListStateDescriptor<>(
+                                getStateName(),
+                                Types.MAP(
+                                        BasicTypeInfo.INT_TYPE_INFO,
+                                        Types.LIST(PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO))
+                        ));
         if (initializeContext.isRestored()) {
             // populate actual holder for restored state
             sourceState.get().forEach(map -> restoredState.putAll(map));
@@ -160,4 +166,8 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     }
 
     protected abstract String getStateName();
+
+    public SeaTunnelSource<SeaTunnelRow, ?, ?> getSource() {
+        return source;
+    }
 }

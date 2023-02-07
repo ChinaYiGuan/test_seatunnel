@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.api.table.type;
 
+import com.google.common.base.Strings;
 import org.apache.seatunnel.api.table.factory.SupportMultipleTable;
 
 import java.io.Serializable;
@@ -28,12 +29,31 @@ import java.util.Objects;
  */
 public final class SeaTunnelRow implements Serializable {
     private static final long serialVersionUID = -1L;
-    /** Table identifier, used for the source connector that {@link SupportMultipleTable}. */
+    /**
+     * Table identifier, used for the source connector that {@link SupportMultipleTable}.
+     */
     private int tableId = -1;
-    /** The kind of change that a row describes in a changelog. */
+    /**
+     * The kind of change that a row describes in a changelog.
+     */
     private RowKind kind = RowKind.INSERT;
-    /** The array to store the actual internal format values. */
+    /**
+     * The array to store the actual internal format values.
+     */
     private final Object[] fields;
+
+    /**
+     * The unique identifier, usually the table name
+     */
+    private String identifier;
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
+    }
 
     public SeaTunnelRow(int arity) {
         this.fields = new Object[arity];
@@ -117,9 +137,9 @@ public final class SeaTunnelRow implements Serializable {
     @Override
     public String toString() {
         return "SeaTunnelRow{" +
-            "tableId=" + tableId +
-            ", kind=" + kind.shortString() +
-            ", fields=" + Arrays.toString(fields) +
-            '}';
+                "tableId=" + tableId +
+                ", kind=" + kind.shortString() +
+                ", fields=" + Arrays.toString(fields) +
+                '}';
     }
 }

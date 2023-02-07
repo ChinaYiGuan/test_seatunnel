@@ -23,8 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
-import org.apache.seatunnel.common.utils.MultilineJsonFormatUtil;
 import org.apache.seatunnel.connectors.doris.config.SinkConfig;
+import org.apache.seatunnel.connectors.doris.domain.Record;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorErrorCode;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorException;
 
@@ -37,15 +37,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 public class DorisSinkManager {
 
     private final SinkConfig sinkConfig;
-    //private final List<byte[]> batchList;
-    private final List<MultilineJsonFormatUtil.CvtResp> batchList;
+    private final List<Record> batchList;
 
     private final DorisStreamLoadVisitor dorisStreamLoadVisitor;
     private ScheduledExecutorService scheduler;
@@ -57,11 +56,11 @@ public class DorisSinkManager {
 
     private final Integer batchIntervalMs;
 
-    public DorisSinkManager(SinkConfig sinkConfig, List<String> fileNames) {
+    public DorisSinkManager(SinkConfig sinkConfig, Function<String, String[]> nameFun) {
         this.sinkConfig = sinkConfig;
         this.batchList = new ArrayList<>();
         this.batchIntervalMs = sinkConfig.getBatchIntervalMs();
-        dorisStreamLoadVisitor = new DorisStreamLoadVisitor(sinkConfig, fileNames);
+        dorisStreamLoadVisitor = new DorisStreamLoadVisitor(sinkConfig, nameFun);
     }
 
     private void tryInit() throws IOException {
@@ -81,14 +80,11 @@ public class DorisSinkManager {
         }, batchIntervalMs, batchIntervalMs, TimeUnit.MILLISECONDS);
     }
 
-    public synchronized void write(String originRecord) throws IOException {
-        MultilineJsonFormatUtil.CvtResp resp = MultilineJsonFormatUtil.read(originRecord, true, false);
+    public synchronized void write(Record record) throws IOException {
         tryInit();
         checkFlushException();
-        String record = resp.getDataJson();
-        byte[] bts = record.getBytes(StandardCharsets.UTF_8);
-        //batchList.add(bts);
-        batchList.add(resp);
+        byte[] bts = record.getDataJson().getBytes(StandardCharsets.UTF_8);
+        batchList.add(record);
         batchRowCount++;
         batchBytesSize += bts.length;
         if (batchRowCount >= sinkConfig.getBatchMaxSize() || batchBytesSize >= sinkConfig.getBatchMaxBytes()) {
@@ -110,33 +106,28 @@ public class DorisSinkManager {
         if (batchList.isEmpty()) {
             return;
         }
-        Map<String, List<MultilineJsonFormatUtil.CvtResp>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(x -> Objects.nonNull(x.getMeta()) && StringUtils.isNotBlank(x.getMeta().getIdentifier()) ? x.getMeta().getIdentifier() : sinkConfig.getTable()));
-        for (Iterator<Map.Entry<String, List<MultilineJsonFormatUtil.CvtResp>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, List<MultilineJsonFormatUtil.CvtResp>> entry = it.next();
-            String group = entry.getKey();
-            List<MultilineJsonFormatUtil.CvtResp> groupList = entry.getValue();
-            String label = createBatchLabel(group);
+        Map<String, List<Record>> groupBatchMap = batchList.stream()
+                .collect(Collectors.groupingBy(x -> StringUtils.isNotBlank(x.getIdentifier()) ? sinkConfig.getTablePrefix() + x.getIdentifier() : sinkConfig.getTable()));
+
+        for (Iterator<Map.Entry<String, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<Record>> entry = it.next();
+            String table = entry.getKey();
+            List<Record> groupList = entry.getValue();
+            String label = createBatchLabel(table);
             long groupByteSize = groupList.stream()
-                    .map(x -> Pair.of(x.getDataJson(), x.getMeta()))
-                    .map(Pair::getLeft)
-                    .filter(Objects::nonNull)
+                    .map(Record::getDataJson)
+                    .filter(StringUtils::isNotBlank)
                     .map(x -> x.getBytes(StandardCharsets.UTF_8).length)
                     .reduce(0, (x0, x1) -> x1 + x1)
                     .longValue();
 
-            List<String> groupBatchList = groupList.stream()
-                    .map(x -> Pair.of(x.getDataJson(), x.getMeta()))
-                    .map(Pair::getLeft)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            Stream<Pair<String, MultilineJsonFormatUtil.CvtMeta>> pairStream = groupList.stream().map(x -> Pair.of(x.getDataJson(), x.getMeta()));
             DorisFlushTuple tuple = new DorisFlushTuple(
-                    StringUtils.isNotBlank(sinkConfig.getTable()) ? sinkConfig.getTable() : sinkConfig.getTablePrefix() + StringUtils.substringAfter(group, "."),
+                    table,
                     label,
                     groupByteSize,
-                    groupBatchList
+                    groupList
             );
+
             for (int i = 0; i <= sinkConfig.getMaxRetries(); i++) {
                 try {
                     Boolean successFlag = dorisStreamLoadVisitor.doStreamLoad(tuple);
@@ -150,7 +141,7 @@ public class DorisSinkManager {
                     }
 
                     if (e instanceof DorisConnectorException && ((DorisConnectorException) e).needReCreateLabel()) {
-                        String newLabel = createBatchLabel(group);
+                        String newLabel = createBatchLabel(table);
                         log.warn(String.format("Batch label changed from [%s] to [%s]", tuple.getLabel(), newLabel));
                         tuple.setLabel(newLabel);
                     }
@@ -167,6 +158,7 @@ public class DorisSinkManager {
                 }
             }
         }
+
         batchList.clear();
         batchRowCount = 0;
         batchBytesSize = 0;

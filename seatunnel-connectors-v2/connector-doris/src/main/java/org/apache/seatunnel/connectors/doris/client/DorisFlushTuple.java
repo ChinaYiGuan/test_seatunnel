@@ -19,14 +19,15 @@ package org.apache.seatunnel.connectors.doris.client;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.apache.seatunnel.connectors.doris.domain.Record;
 
 import java.util.List;
 
 @AllArgsConstructor
 @Data
 public class DorisFlushTuple {
-    private String tab;
+    private String tableName;
     private String label;
     private Long bytes;
-    private List<String> rows;
+    private List<Record> rows;
 }

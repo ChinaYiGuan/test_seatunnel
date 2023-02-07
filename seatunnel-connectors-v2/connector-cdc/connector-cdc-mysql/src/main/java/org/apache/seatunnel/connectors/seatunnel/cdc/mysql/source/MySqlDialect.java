@@ -49,7 +49,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The {@link JdbcDataSourceDialect} implementation for MySQL datasource. */
+/**
+ * The {@link JdbcDataSourceDialect} implementation for MySQL datasource.
+ */
 
 public class MySqlDialect implements JdbcDataSourceDialect {
 
@@ -106,7 +108,7 @@ public class MySqlDialect implements JdbcDataSourceDialect {
 
     @Override
     public MySqlSourceFetchTaskContext createFetchTaskContext(
-        SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final MySqlConnection jdbcConnection =
                 createMySqlConnection(taskSourceConfig.getDbzConfiguration());
         final BinaryLogClient binaryLogClient =
@@ -114,8 +116,15 @@ public class MySqlDialect implements JdbcDataSourceDialect {
         List<TableChanges.TableChange> tableChangeList = new ArrayList<>();
         // TODO: support save table schema
         if (sourceSplitBase instanceof SnapshotSplit) {
-            SnapshotSplit snapshotSplit = (SnapshotSplit) sourceSplitBase;
-            tableChangeList.add(queryTableSchema(jdbcConnection, snapshotSplit.getTableId()));
+            if (taskSourceConfig.getTableList().size() == 1) {
+                SnapshotSplit snapshotSplit = (SnapshotSplit) sourceSplitBase;
+                tableChangeList.add(queryTableSchema(jdbcConnection, snapshotSplit.getTableId()));
+            }
+            if (taskSourceConfig.getTableList().size() > 1) {
+                for (String tableName : taskSourceConfig.getTableList()) {
+                    tableChangeList.add(queryTableSchema(jdbcConnection, TableId.parse(tableName)));
+                }
+            }
         } else {
             IncrementalSplit incrementalSplit = (IncrementalSplit) sourceSplitBase;
             for (TableId tableId : incrementalSplit.getTableIds()) {

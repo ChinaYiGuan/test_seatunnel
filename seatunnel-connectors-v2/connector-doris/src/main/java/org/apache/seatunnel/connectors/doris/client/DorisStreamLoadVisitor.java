@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -50,11 +51,11 @@ public class DorisStreamLoadVisitor {
     private static final String RESULT_LABEL_ABORTED = "ABORTED";
     private static final String RESULT_LABEL_UNKNOWN = "UNKNOWN";
 
-    private List<String> fieldNames;
+    private Function<String, String[]> nameFun;
 
-    public DorisStreamLoadVisitor(SinkConfig sinkConfig, List<String> fieldNames) {
+    public DorisStreamLoadVisitor(SinkConfig sinkConfig, Function<String, String[]> nameFun) {
         this.sinkConfig = sinkConfig;
-        this.fieldNames = fieldNames;
+        this.nameFun = nameFun;
     }
 
     public Boolean doStreamLoad(DorisFlushTuple flushData) throws IOException {
@@ -62,19 +63,18 @@ public class DorisStreamLoadVisitor {
         if (null == host) {
             throw new DorisConnectorException(CommonErrorCode.ILLEGAL_ARGUMENT, "None of the host in `load_url` could be connected.");
         }
-        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, sinkConfig.getDatabase(), flushData.getTab());
+        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, sinkConfig.getDatabase(), flushData.getTableName());
         if (log.isDebugEnabled()) {
             log.debug(String.format("Start to join batch data: rows[%d] bytes[%d] label[%s].", flushData.getRows().size(), flushData.getBytes(), flushData.getLabel()));
         }
         Map<String, Object> loadResult = httpHelper.doHttpPut(
                 loadUrl,
                 joinRows(
-                        flushData.getRows().stream()
-                                .map(x -> x.getBytes(StandardCharsets.UTF_8))
-                                .collect(Collectors.toList()),
+                        flushData.getRows().stream().map(x -> x.getDataJson().getBytes(StandardCharsets.UTF_8)).collect(Collectors.toList()),
                         flushData.getBytes().intValue()
                 ),
-                getStreamLoadHttpHeader(flushData.getLabel()));
+                getStreamLoadHttpHeader(flushData.getLabel())
+        );
         final String keyStatus = "Status";
         if (null == loadResult || !loadResult.containsKey(keyStatus)) {
             throw new DorisConnectorException(CommonErrorCode.FLUSH_DATA_FAILED, "Unable to flush data to Doris: unknown result status. " + loadResult);
@@ -200,9 +200,9 @@ public class DorisStreamLoadVisitor {
 
     private Map<String, String> getStreamLoadHttpHeader(String label) {
         Map<String, String> headerMap = new HashMap<>();
-        if (null != fieldNames && !fieldNames.isEmpty() && SinkConfig.StreamLoadFormat.CSV.equals(sinkConfig.getLoadFormat())) {
-            headerMap.put("columns", String.join(",", fieldNames.stream().map(f -> String.format("`%s`", f)).collect(Collectors.toList())));
-        }
+//        if (null != fieldNames && !fieldNames.isEmpty() && SinkConfig.StreamLoadFormat.CSV.equals(sinkConfig.getLoadFormat())) {
+//            headerMap.put("columns", String.join(",", fieldNames.stream().map(f -> String.format("`%s`", f)).collect(Collectors.toList())));
+//        }
         if (null != sinkConfig.getStreamLoadProps()) {
             for (Map.Entry<String, String> entry : sinkConfig.getStreamLoadProps().entrySet()) {
                 headerMap.put(entry.getKey(), String.valueOf(entry.getValue()));

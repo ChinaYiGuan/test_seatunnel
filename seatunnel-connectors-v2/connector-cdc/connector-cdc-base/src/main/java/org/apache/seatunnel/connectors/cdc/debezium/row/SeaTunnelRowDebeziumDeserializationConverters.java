@@ -30,8 +30,6 @@ import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.common.constants.CollectionConstants;
-import org.apache.seatunnel.common.utils.MultilineJsonFormatUtil;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverter;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
 import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
@@ -42,7 +40,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.*;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -105,57 +102,27 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
     }
 
     public SeaTunnelRow convert(SourceRecord record, Struct struct, Schema schema) throws Exception {
-//        int arity = schema.fields().size();
-//        SeaTunnelRow row = new SeaTunnelRow(arity);
-//        SeaTunnelRowType[] types = new SeaTunnelRowType[arity];
-//        List<Field> fields = schema.fields();
-//        for (int i = 0; i < arity; i++) {
-//            Field field = fields.get(i);
-//            String fieldName = field.name();
-//            String fieldType = field.schema().type().name();
-//            Object fieldValue = struct.get(fieldName);
-//            SeaTunnelRowType seaTunnelRowType = new SeaTunnelRowType(new String[]{fieldName}, new SeaTunnelDataType[]{typeMapping(fieldType)});
-//            row.setField(i, fieldValue);
-//            types[i]= seaTunnelRowType;
-//        }
-//        row.setTypes(types);
-
         int arity = physicalConverters.length + metadataConverters.length;
         SeaTunnelRow row = new SeaTunnelRow(arity);
         // physical column
-        if (physicalConverters.length == 2 && CollectionConstants.JSON_DATA_KEY.equals(fieldNames[0]) && CollectionConstants.JSON_META_KEY.equals(fieldNames[1])) {
-            List<Field> fields = schema.fields();
-            MultilineJsonFormatUtil.CvtData[] cvtDatas = new MultilineJsonFormatUtil.CvtData[fields.size()];
-            for (int j = 0; j < fields.size(); j++) {
-                Field field = fields.get(j);
-                String name = field.name();
-                String type = field.schema().type().name();
-                Object value = struct.get(name);
-                cvtDatas[j] = new MultilineJsonFormatUtil.CvtData(name, type, value);
-            }
-            String[] split = record.topic().split("\\.");
-            String dbTab = split.length == 3 ? split[1] + "." + split[2] : record.topic();
-            MultilineJsonFormatUtil.CvtResp cvtResp = MultilineJsonFormatUtil.writer(cvtDatas, dbTab);
-            row.setField(0, cvtResp.getDataJson());
-            row.setField(1, cvtResp.getMetaJson());
-        } else {
-            for (int i = 0; i < physicalConverters.length; i++) {
-                String fieldName = fieldNames[i];
-                Object fieldValue = struct.get(fieldName);
-                Field field = schema.field(fieldName);
-                if (field == null) {
-                    row.setField(i, null);
-                } else {
-                    Schema fieldSchema = field.schema();
-                    Object convertedField = SeaTunnelRowDebeziumDeserializationConverters.convertField(physicalConverters[i], fieldValue, fieldSchema);
-                    row.setField(i, convertedField);
-                }
+        for (int i = 0; i < physicalConverters.length; i++) {
+            String fieldName = fieldNames[i];
+            Object fieldValue = struct.get(fieldName);
+            Field field = schema.field(fieldName);
+            if (field == null) {
+                row.setField(i, null);
+            } else {
+                Schema fieldSchema = field.schema();
+                Object convertedField = SeaTunnelRowDebeziumDeserializationConverters.convertField(physicalConverters[i], fieldValue, fieldSchema);
+                row.setField(i, convertedField);
             }
         }
         // metadata column
         for (int i = 0; i < metadataConverters.length; i++) {
             row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
         }
+        String[] split = record.topic().split("\\.");
+        row.setIdentifier(split.length == 3 ? split[2] : record.topic());
         return row;
     }
 

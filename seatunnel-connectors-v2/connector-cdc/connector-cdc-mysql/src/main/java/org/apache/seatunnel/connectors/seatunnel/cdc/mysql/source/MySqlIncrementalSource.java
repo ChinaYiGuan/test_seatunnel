@@ -18,10 +18,14 @@
 package org.apache.seatunnel.connectors.seatunnel.cdc.mysql.source;
 
 import com.google.auto.service.AutoService;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.catalog.TablePath;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.cdc.base.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.cdc.base.config.SourceConfig;
@@ -38,10 +42,15 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.JdbcCatalogOptions
 import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.MySqlCatalog;
 
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @AutoService(SeaTunnelSource.class)
-public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig> {
-    @Override
+public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig> implements DynamicRowType<T> {
+
     public String getPluginName() {
         return "MySQL-CDC";
     }
@@ -58,26 +67,9 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
 
     @SuppressWarnings("unchecked")
     @Override
-    public DebeziumDeserializationSchema<T> createDebeziumDeserializationSchema(ReadonlyConfig config) {
+    public Map<String, DebeziumDeserializationSchema<T>> createDebeziumDeserializationSchemaMap(ReadonlyConfig config) {
         JdbcSourceConfig jdbcSourceConfig = configFactory.create(0);
         String baseUrl = config.get(JdbcCatalogOptions.BASE_URL);
-
-        // TODO: support multi-table
-        // TODO: support metadata keys
-        SeaTunnelRowType physicalRowType = SeaTunnelRowType.MULTILINE_JSON_TYPE;
-        String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
-        if (jdbcSourceConfig.getTableList().size() == 1) {
-            MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", jdbcSourceConfig.getDatabaseList().get(0), jdbcSourceConfig.getUsername(), jdbcSourceConfig.getPassword(), baseUrl);
-            CatalogTable table = mySqlCatalog.getTable(TablePath.of(jdbcSourceConfig.getDatabaseList().get(0), config.get(JdbcSourceOptions.TABLE_NAME)));
-            physicalRowType = table.getTableSchema().toPhysicalRowDataType();
-        }
-
-        return (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
-                .setPhysicalRowType(physicalRowType)
-                .setResultTypeInfo(physicalRowType)
-                .setServerTimeZone(ZoneId.of(zoneId))
-                .build();
-        /*
         MySqlCatalog mySqlCatalog = new MySqlCatalog("mysql", "", jdbcSourceConfig.getUsername(), jdbcSourceConfig.getPassword(), baseUrl);
         List<String> dbs = mySqlCatalog.listDatabases().stream()
                 .filter(findDbName -> jdbcSourceConfig.getDatabaseList().stream().anyMatch(dbNamePt -> Pattern.matches(dbNamePt, findDbName)))
@@ -90,18 +82,21 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
                 ).filter(dbTabName -> dbTabName.contains(".") && dbTabName.split("\\.").length == 2)
                 .collect(Collectors.toList());
 
-        return tabs.stream()
+        Map<String, DebeziumDeserializationSchema<T>> collect = tabs.stream()
                 .map(dbTab -> {
                     final CatalogTable table = mySqlCatalog.getTable(TablePath.of(dbTab));
                     final SeaTunnelRowType physicalRowType = table.getTableSchema().toPhysicalRowDataType();
                     final String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
-                    return Pair.of(Pair.of(dbTab.split("\\.")[0], dbTab.split("\\.")[1]), (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
-                            .setPhysicalRowType(physicalRowType)
-                            .setResultTypeInfo(physicalRowType)
-                            .setServerTimeZone(ZoneId.of(zoneId))
-                            .build());
+                    return Pair.of(dbTab.split("\\.")[1],
+                            (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
+                                    .setPhysicalRowType(physicalRowType)
+                                    .setResultTypeInfo(physicalRowType)
+                                    .setServerTimeZone(ZoneId.of(zoneId))
+                                    .build()
+                    );
                 }).collect(LinkedHashMap::new, (m, x) -> m.put(x.getLeft(), x.getRight()), Map::putAll);
-         */
+
+        return collect;
     }
 
     @Override
@@ -112,5 +107,13 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
     @Override
     public OffsetFactory createOffsetFactory(ReadonlyConfig config) {
         return new BinlogOffsetFactory((MySqlSourceConfigFactory) configFactory, (JdbcDataSourceDialect) dataSourceDialect);
+    }
+
+    @Override
+    public SeaTunnelDataType<T> getDynamicRowType(String identifier) {
+        if (MapUtils.isNotEmpty(deserializationSchemaMap) && deserializationSchemaMap.containsKey(identifier)) {
+            return deserializationSchemaMap.get(identifier).getProducedType();
+        }
+        return null;
     }
 }

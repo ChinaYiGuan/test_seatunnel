@@ -18,6 +18,7 @@
 package org.apache.seatunnel.connectors.cdc.base.source.reader;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.Offset;
@@ -30,6 +31,7 @@ import org.apache.seatunnel.connectors.seatunnel.common.source.reader.RecordEmit
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isLowWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isWatermarkEvent;
@@ -46,15 +48,15 @@ import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.i
 public class IncrementalSourceRecordEmitter<T>
         implements RecordEmitter<SourceRecords, T, SourceSplitStateBase> {
 
-    protected final DebeziumDeserializationSchema<T> deserializationSchema;
+    protected final Map<String, DebeziumDeserializationSchema<T>> deserializationSchemaMap;
     protected final OutputCollector<T> outputCollector;
 
     protected final OffsetFactory offsetFactory;
 
     public IncrementalSourceRecordEmitter(
-            DebeziumDeserializationSchema<T> deserializationSchema,
+            Map<String, DebeziumDeserializationSchema<T>> deserializationSchemaMap,
             OffsetFactory offsetFactory) {
-        this.deserializationSchema = deserializationSchema;
+        this.deserializationSchemaMap = deserializationSchemaMap;
         this.outputCollector = new OutputCollector<>();
         this.offsetFactory = offsetFactory;
     }
@@ -110,18 +112,18 @@ public class IncrementalSourceRecordEmitter<T>
 
     protected void emitElement(SourceRecord element, Collector<T> output) throws Exception {
         outputCollector.output = output;
-        /*
-        if (Objects.nonNull(element) && StringUtils.isNotBlank(element.topic()) && element.topic().split("\\.").length >= 3) {
-            String db = element.topic().split("\\.")[1];
+        if (Objects.nonNull(element) &&
+                StringUtils.isNotBlank(element.topic()) &&
+                element.topic().split("\\.").length >= 3 &&
+                deserializationSchemaMap.containsKey(element.topic().split("\\.")[2])
+        ) {
             String tab = element.topic().split("\\.")[2];
-            DebeziumDeserializationSchema<T> debeziumDeserializationSchema = deserializationSchemaMap.get(Pair.of(db, tab));
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema = deserializationSchemaMap.get(tab);
             if (Objects.nonNull(debeziumDeserializationSchema)) {
                 debeziumDeserializationSchema.deserialize(element, outputCollector);
             }
         } else
             deserializationSchemaMap.entrySet().stream().findFirst().get().getValue().deserialize(element, outputCollector);
-        */
-        deserializationSchema.deserialize(element, outputCollector);
     }
 
     private static class OutputCollector<T> implements Collector<T> {

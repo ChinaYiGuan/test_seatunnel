@@ -17,25 +17,38 @@
 
 package org.apache.seatunnel.translation.flink.serialization;
 
-import org.apache.seatunnel.api.table.type.MapType;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.api.table.type.SqlType;
-import org.apache.seatunnel.translation.serialization.RowConverter;
-
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONWriter;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
+import org.apache.seatunnel.api.table.type.*;
+import org.apache.seatunnel.common.tsf.TsfData;
+import org.apache.seatunnel.common.tsf.TsfMeta;
+import org.apache.seatunnel.translation.serialization.RowConverter;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+@Slf4j
 public class FlinkRowConverter extends RowConverter<Row> {
+
+
 
     public FlinkRowConverter(SeaTunnelDataType<?> dataType) {
         super(dataType);
+    }
+
+    public FlinkRowConverter(SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
+        super(dataType, dynamicRowTypeFunction);
     }
 
     @Override
@@ -44,13 +57,16 @@ public class FlinkRowConverter extends RowConverter<Row> {
         return (Row) convert(seaTunnelRow, dataType);
     }
 
-    private static Object convert(Object field, SeaTunnelDataType<?> dataType) {
+
+    private Object convert(Object field, SeaTunnelDataType<?> dataType) {
         if (field == null) {
             return null;
         }
         SqlType sqlType = dataType.getSqlType();
         switch (sqlType) {
             case ROW:
+                return dynamicRowConvert((SeaTunnelRow) field, (SeaTunnelRowType) dataType);
+                /*
                 SeaTunnelRow seaTunnelRow = (SeaTunnelRow) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
                 int arity = rowType.getTotalFields();
@@ -59,9 +75,16 @@ public class FlinkRowConverter extends RowConverter<Row> {
                     engineRow.setField(i, convert(seaTunnelRow.getField(i), rowType.getFieldType(i)));
                 }
                 engineRow.setKind(RowKind.fromByteValue(seaTunnelRow.getRowKind().toByteValue()));
+
+                final String identifier = seaTunnelRow.getIdentifier();
+                if (StringUtils.isNotBlank(identifier)) {
+                    Row firstRow = Row.of(identifier);
+                    return Row.join(firstRow, engineRow);
+                }
                 return engineRow;
+                 */
             case MAP:
-                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, FlinkRowConverter::convert);
+                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, this::convert);
             default:
                 return field;
         }
@@ -90,13 +113,17 @@ public class FlinkRowConverter extends RowConverter<Row> {
         return (SeaTunnelRow) reconvert(engineRow, dataType);
     }
 
-    private static Object reconvert(Object field, SeaTunnelDataType<?> dataType) {
+
+    private Object reconvert(Object field, SeaTunnelDataType<?> dataType) {
         if (field == null) {
             return null;
         }
         SqlType sqlType = dataType.getSqlType();
         switch (sqlType) {
             case ROW:
+                return dynamicRowReconvert((Row) field, (SeaTunnelRowType) dataType);
+/*
+
                 Row engineRow = (Row) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
                 int arity = rowType.getTotalFields();
@@ -106,10 +133,91 @@ public class FlinkRowConverter extends RowConverter<Row> {
                 }
                 seaTunnelRow.setRowKind(org.apache.seatunnel.api.table.type.RowKind.fromByteValue(engineRow.getKind().toByteValue()));
                 return seaTunnelRow;
+ */
             case MAP:
-                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, FlinkRowConverter::reconvert);
+                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, this::reconvert);
             default:
                 return field;
         }
+    }
+
+    private Row dynamicRowConvert(SeaTunnelRow seaTunnelRow, SeaTunnelRowType rowType) {
+        final String identifier = seaTunnelRow.getIdentifier();
+        SeaTunnelRowType tsfRowType = rowType;
+        if (Arrays.equals(rowType.getFieldNames(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldNames()) &&
+                Arrays.equals(rowType.getFieldTypes(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldTypes()) &&
+                StringUtils.isNotBlank(identifier) && Objects.nonNull(dynamicRowTypeFunction)) {
+            tsfRowType = getDynamicRowType(identifier);
+            if (Objects.isNull(tsfRowType)) {
+                log.error(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
+                throw new RuntimeException(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
+            }
+        }
+
+        final int arity = tsfRowType.getTotalFields();
+        Row engineRow = new Row(arity);
+        for (int i = 0; i < arity; i++) {
+            engineRow.setField(i, convert(seaTunnelRow.getField(i), tsfRowType.getFieldType(i)));
+        }
+
+        if (Arrays.equals(rowType.getFieldNames(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldNames()) &&
+                Arrays.equals(rowType.getFieldTypes(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldTypes()) &&
+                StringUtils.isNotBlank(identifier) && Objects.nonNull(dynamicRowTypeFunction)) {
+            final List<TsfData> dataList = new ArrayList<>();
+            for (int i = 0; i < arity; i++) {
+                dataList.add(new TsfData(i + "", tsfRowType.getFieldType(i).getTypeClass().getSimpleName(), engineRow.getField(i)));
+            }
+
+            final TsfMeta cvtMeta = new TsfMeta();
+            cvtMeta.setIdentifier(identifier);
+            cvtMeta.setTime(LocalDateTime.now());
+            cvtMeta.setNames(dataList.stream().map(TsfData::getName).collect(Collectors.toList()));
+            cvtMeta.setTypes(dataList.stream().map(TsfData::getType).collect(Collectors.toList()));
+
+            engineRow = Row.of(
+                    JSON.toJSONString(dataList, JSONWriter.Feature.WriteNulls),
+                    JSON.toJSONString(cvtMeta, JSONWriter.Feature.WriteNulls)
+            );
+        }
+        engineRow.setKind(RowKind.fromByteValue(seaTunnelRow.getRowKind().toByteValue()));
+
+        return engineRow;
+    }
+
+    private SeaTunnelRow dynamicRowReconvert(Row engineRow, SeaTunnelRowType engineRowDataType) {
+        int arity = engineRowDataType.getTotalFields();
+        SeaTunnelRow seaTunnelRow = new SeaTunnelRow(arity);
+        if (Arrays.equals(engineRowDataType.getFieldNames(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldNames()) &&
+                Arrays.equals(engineRowDataType.getFieldTypes(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldTypes()) &&
+                Objects.nonNull(dynamicRowTypeFunction)) {
+
+            List<TsfData> tsfDataList = JSON.parseArray((String) engineRow.getField(0), TsfData.class);
+            TsfMeta tsfMeta = JSON.parseObject((String) engineRow.getField(1), TsfMeta.class);
+            if (tsfDataList != null && tsfMeta != null && StringUtils.isNotBlank(tsfMeta.getIdentifier())) {
+                String identifier = tsfMeta.getIdentifier();
+                SeaTunnelRowType tsfRowType = getDynamicRowType(identifier);
+                int dynamicArity = tsfRowType.getTotalFields();
+                seaTunnelRow = new SeaTunnelRow(dynamicArity);
+                seaTunnelRow.setIdentifier(identifier);
+                if (Objects.isNull(tsfRowType)) {
+                    log.error("The DynamicRowType subclass must implement the getDynamicRowType method!");
+                    throw new RuntimeException("The DynamicRowType subclass must implement the getDynamicRowType method!");
+                }
+
+                for (int i = 0; i < dynamicArity; i++) {
+                    if (tsfDataList.size() > i) {
+                        TsfData cvtData = tsfDataList.get(i);
+                        Object value = cvtData.getValue();
+                        seaTunnelRow.setField(i, reconvert(value, tsfRowType.getFieldType(i)));
+                    }
+                }
+            }
+        } else {
+            for (int i = 0; i < arity; i++) {
+                seaTunnelRow.setField(i, reconvert(engineRow.getField(i), engineRowDataType.getFieldType(i)));
+            }
+        }
+        seaTunnelRow.setRowKind(org.apache.seatunnel.api.table.type.RowKind.fromByteValue(engineRow.getKind().toByteValue()));
+        return seaTunnelRow;
     }
 }

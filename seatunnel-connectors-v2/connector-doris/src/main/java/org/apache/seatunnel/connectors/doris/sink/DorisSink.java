@@ -17,6 +17,10 @@
 
 package org.apache.seatunnel.connectors.doris.sink;
 
+import com.google.auto.service.AutoService;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -27,21 +31,32 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.config.CheckConfigUtil;
 import org.apache.seatunnel.common.config.CheckResult;
 import org.apache.seatunnel.common.constants.PluginType;
+import org.apache.seatunnel.connectors.doris.domain.rest.SchemaResp;
 import org.apache.seatunnel.connectors.doris.exception.DorisConnectorException;
+import org.apache.seatunnel.connectors.doris.util.DorisTypeConvertUtil;
+import org.apache.seatunnel.connectors.doris.util.rest.DorisRestUtil;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSimpleSink;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
-import com.google.auto.service.AutoService;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.seatunnel.connectors.doris.config.SinkConfig.*;
 
 @AutoService(SeaTunnelSink.class)
-public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
+public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements DynamicRowType<SeaTunnelRow> {
 
     private Config pluginConfig;
     private SeaTunnelRowType seaTunnelRowType;
+    private DorisRestUtil restUtil;
+    private String db;
+    private String tab;
+    private String tabOrPrefix;
+
+    private final Map<String, SeaTunnelRowType> tsfTypes = new LinkedHashMap<>();
 
     @Override
     public String getPluginName() {
@@ -58,6 +73,19 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
                     String.format("PluginName: %s, PluginType: %s, Message: %s",
                             getPluginName(), PluginType.SINK, result.getMsg()));
         }
+        this.db = pluginConfig.getString(DATABASE.key());
+        this.tab = pluginConfig.hasPath(TABLE.key()) ? pluginConfig.getString(TABLE.key()) : null;
+        this.tabOrPrefix = StringUtils.isNotBlank(tab) ? tab : pluginConfig.getString(TABLE_PREFIX.key());
+
+        String user = pluginConfig.getString(USERNAME.key());
+        String pass = pluginConfig.getString(PASSWORD.key());
+        String feHostPort = pluginConfig.getList(NODE_URLS.key()).get(0).unwrapped().toString();
+        this.restUtil = new DorisRestUtil(
+                feHostPort.split(":")[0]
+                , Integer.parseInt(feHostPort.split(":")[1])
+                , user
+                , pass
+        );
     }
 
     @Override
@@ -72,6 +100,30 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context) {
-        return new DorisSinkWriter(pluginConfig, seaTunnelRowType);
+        if (StringUtils.isBlank(tab)) {
+            tsfTypes.put(tab, seaTunnelRowType);
+        }
+        return new DorisSinkWriter(pluginConfig, tsfTypes);
     }
+
+    @Override
+    public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
+        if (tsfTypes.containsKey(identifier)) return tsfTypes.get(identifier);
+        SchemaResp schemaResp = restUtil.querySchema(db, tabOrPrefix + identifier);
+        if (schemaResp != null && schemaResp.getProperties() != null) {
+            List<Pair<String, ? extends SeaTunnelDataType<?>>> nameTypePairList = schemaResp.getProperties()
+                    .stream()
+                    .map(x -> {
+                        SeaTunnelDataType<?> seaTunnelDataType = DorisTypeConvertUtil.convertFromColumn(x.getType());
+                        return Pair.of(x.getName(), seaTunnelDataType);
+                    }).collect(Collectors.toList());
+            String[] names = nameTypePairList.stream().map(Pair::getLeft).toArray(String[]::new);
+            SeaTunnelDataType[] seaTunnelDataTypes = nameTypePairList.stream().map(Pair::getRight).toArray(SeaTunnelDataType[]::new);
+            SeaTunnelRowType ty = new SeaTunnelRowType(names, seaTunnelDataTypes);
+            tsfTypes.put(identifier, ty);
+            return ty;
+        }
+        return null;
+    }
+
 }

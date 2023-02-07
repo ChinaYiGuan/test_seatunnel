@@ -17,15 +17,15 @@
 
 package org.apache.seatunnel.translation.flink.source;
 
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.translation.flink.serialization.FlinkRowConverter;
 
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.types.Row;
-
 import java.io.IOException;
+import java.util.function.Function;
 
 public class RowCollector implements Collector<SeaTunnelRow> {
 
@@ -38,6 +38,13 @@ public class RowCollector implements Collector<SeaTunnelRow> {
         this.checkpointLock = checkpointLock;
         this.rowSerialization = new FlinkRowConverter(dataType);
     }
+
+    public RowCollector(SourceFunction.SourceContext<Row> internalCollector, Object checkpointLock, SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
+        this.internalCollector = internalCollector;
+        this.checkpointLock = checkpointLock;
+        this.rowSerialization = new FlinkRowConverter(dataType, dynamicRowTypeFunction);
+    }
+
 
     @Override
     public void collect(SeaTunnelRow record) {

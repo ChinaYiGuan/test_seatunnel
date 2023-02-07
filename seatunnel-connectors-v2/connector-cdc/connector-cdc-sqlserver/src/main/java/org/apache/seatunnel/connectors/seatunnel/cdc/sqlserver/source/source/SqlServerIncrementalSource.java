@@ -42,6 +42,8 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 
 import java.time.ZoneId;
+import java.util.Collections;
+import java.util.Map;
 
 @AutoService(SeaTunnelSource.class)
 public class SqlServerIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig> {
@@ -60,9 +62,12 @@ public class SqlServerIncrementalSource<T> extends IncrementalSource<T, JdbcSour
         return configFactory;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public DebeziumDeserializationSchema<T> createDebeziumDeserializationSchema(ReadonlyConfig config) {
+    public Map<String, DebeziumDeserializationSchema<T>> createDebeziumDeserializationSchemaMap(ReadonlyConfig config) {
+        return Collections.singletonMap(null,createDebeziumDeserializationSchema(config));
+    }
+
+    private DebeziumDeserializationSchema<T> createDebeziumDeserializationSchema(ReadonlyConfig config) {
         SqlServerSourceConfig sqlServerSourceConfig = (SqlServerSourceConfig) this.configFactory.create(0);
         TableId tableId = this.dataSourceDialect.discoverDataCollections(sqlServerSourceConfig).get(0);
 
