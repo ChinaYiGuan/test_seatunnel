@@ -17,17 +17,22 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.source;
 
-import org.apache.seatunnel.api.source.SourceSplit;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.apache.seatunnel.api.source.SourceSplit;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.state.JdbcSourceCfgMeta;
 
 @Data
 @AllArgsConstructor
 public class JdbcSourceSplit implements SourceSplit {
 
     Object[] parameterValues;
+
     Integer splitId;
+    JdbcSourceCfgMeta JdbcSourceCfgMeta;
+
+    String partitionColumnName;
+    boolean isLast = false;
 
     @Override
     public String splitId() {

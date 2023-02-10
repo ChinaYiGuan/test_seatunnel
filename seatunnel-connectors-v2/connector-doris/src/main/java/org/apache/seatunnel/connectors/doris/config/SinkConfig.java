@@ -72,7 +72,7 @@ public class SinkConfig {
 
     public static final Option<String> TABLE_PREFIX = Options.key("table.prefix")
             .stringType()
-            .noDefaultValue()
+            .defaultValue("")
             .withDescription("The name of Doris table prefix");
 
     public static final Option<String> DORIS_SINK_CONFIG_PREFIX = Options.key("sink.properties.")

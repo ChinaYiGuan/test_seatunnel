@@ -36,6 +36,7 @@ public class JdbcSinkOptions implements Serializable {
     private boolean isExactlyOnce;
     public String simpleSQL;
     private String table;
+    private String tablePrefix;
     private List<String> primaryKeys;
     private boolean supportUpsertByQueryPrimaryKeyExist;
 
@@ -44,7 +45,6 @@ public class JdbcSinkOptions implements Serializable {
         if (config.hasPath(JdbcConfig.IS_EXACTLY_ONCE.key()) && config.getBoolean(JdbcConfig.IS_EXACTLY_ONCE.key())) {
             this.isExactlyOnce = true;
         }
-
         if (config.hasPath(JdbcConfig.TABLE.key())) {
             this.table = config.getString(JdbcConfig.TABLE.key());
             if (config.hasPath(JdbcConfig.PRIMARY_KEYS.key())) {
@@ -54,8 +54,14 @@ public class JdbcSinkOptions implements Serializable {
             if (config.hasPath(JdbcConfig.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST.key())) {
                 this.supportUpsertByQueryPrimaryKeyExist = config.getBoolean(JdbcConfig.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST.key());
             }
-        } else {
+        }else if(config.hasPath(JdbcConfig.QUERY.key())) {
             this.simpleSQL = config.getString(JdbcConfig.QUERY.key());
+        } else {
+            this.tablePrefix = config.getString(JdbcConfig.TABLE_PREFIX.key());
+            this.supportUpsertByQueryPrimaryKeyExist = JdbcConfig.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST.defaultValue();
+            if (config.hasPath(JdbcConfig.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST.key())) {
+                this.supportUpsertByQueryPrimaryKeyExist = config.getBoolean(JdbcConfig.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST.key());
+            }
         }
     }
 }

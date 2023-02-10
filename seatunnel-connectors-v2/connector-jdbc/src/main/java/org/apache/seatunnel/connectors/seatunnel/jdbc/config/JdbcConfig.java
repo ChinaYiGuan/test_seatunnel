@@ -48,7 +48,7 @@ public class JdbcConfig implements Serializable {
 
     public static final Option<Integer> BATCH_SIZE = Options.key("batch_size").intType().noDefaultValue().withDescription("batch size");
 
-    public static final Option<Integer> FETCH_SIZE = Options.key("fetch_size").intType().defaultValue(0).withDescription("For queries that return a large number of objects, " +
+    public static final Option<Integer> FETCH_SIZE = Options.key("fetch_size").intType().defaultValue(1024).withDescription("For queries that return a large number of objects, " +
         "you can configure the row fetch size used in the query to improve performance by reducing the number database hits required to satisfy the selection criteria. Zero means use jdbc default value.");
 
     public static final Option<Integer> BATCH_INTERVAL_MS = Options.key("batch_interval_ms").intType().noDefaultValue().withDescription("batch interval milliSecond");
@@ -64,6 +64,7 @@ public class JdbcConfig implements Serializable {
     public static final Option<String> TRANSACTION_TIMEOUT_SEC = Options.key("transaction_timeout_sec").stringType().noDefaultValue().withDescription("transaction timeout (second)");
 
     public static final Option<String> TABLE = Options.key("table").stringType().noDefaultValue().withDescription("table");
+    public static final Option<String> TABLE_PREFIX = Options.key("table.prefix").stringType().noDefaultValue().withDescription("table prefix");
 
     public static final Option<List<String>> PRIMARY_KEYS = Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
 
@@ -75,6 +76,8 @@ public class JdbcConfig implements Serializable {
     public static final Option<String> PARTITION_UPPER_BOUND = Options.key("partition_upper_bound").stringType().noDefaultValue().withDescription("partition upper bound");
     public static final Option<String> PARTITION_LOWER_BOUND = Options.key("partition_lower_bound").stringType().noDefaultValue().withDescription("partition lower bound");
     public static final Option<String> PARTITION_NUM = Options.key("partition_num").stringType().noDefaultValue().withDescription("partition num");
+    public static final Option<Boolean> AUTO_PARTITION = Options.key("auto_partition").booleanType().defaultValue(false).withDescription("auto partition");
+    public static final Option<String> TABLES = Options.key("tables").stringType().noDefaultValue().withDescription("multiple tables");
 
     public static JdbcConnectionOptions buildJdbcConnectionOptions(Config config) {
 

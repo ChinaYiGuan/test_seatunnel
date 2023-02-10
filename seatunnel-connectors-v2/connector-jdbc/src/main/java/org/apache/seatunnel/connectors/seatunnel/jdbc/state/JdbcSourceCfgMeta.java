@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.connectors.seatunnel.jdbc.source;
+package org.apache.seatunnel.connectors.seatunnel.jdbc.state;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -24,13 +24,9 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class PartitionParameter implements Serializable {
-
-    private String partitionColumnName;
-    private Integer partitionNumber;
-    private Object min;
-    private Object max;
-
+@AllArgsConstructor
+public class JdbcSourceCfgMeta implements Serializable {
+    private String table;
+    private String query;
 }

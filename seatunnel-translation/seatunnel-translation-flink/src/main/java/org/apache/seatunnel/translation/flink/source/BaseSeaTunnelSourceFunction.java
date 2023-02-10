@@ -33,10 +33,10 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.types.Row;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
+import org.apache.seatunnel.translation.flink.statistics.SourceStatistics;
 import org.apache.seatunnel.translation.flink.utils.TypeConverterUtils;
 import org.apache.seatunnel.translation.source.BaseSourceFunction;
 import org.slf4j.Logger;
@@ -60,13 +60,19 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     protected final AtomicLong latestCompletedCheckpointId = new AtomicLong(0);
     protected final AtomicLong latestTriggerCheckpointId = new AtomicLong(0);
 
+    private final Config sourceCfg;
+
+    private final SourceStatistics sourceStatistics;
+
     /**
      * Flag indicating whether the consumer is still running.
      */
     private volatile boolean running = true;
 
-    public BaseSeaTunnelSourceFunction(SeaTunnelSource<SeaTunnelRow, ?, ?> source) {
+    public BaseSeaTunnelSourceFunction(SeaTunnelSource<SeaTunnelRow, ?, ?> source, Config sourceCfg) {
         this.source = source;
+        this.sourceCfg = sourceCfg;
+        this.sourceStatistics = new SourceStatistics(sourceCfg, source);
     }
 
     @Override
@@ -74,6 +80,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
         super.open(parameters);
         this.internalSource = createInternalSource();
         this.internalSource.open();
+        this.sourceStatistics.open();
     }
 
     protected abstract BaseSourceFunction<SeaTunnelRow> createInternalSource();
@@ -81,12 +88,8 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
     public void run(SourceFunction.SourceContext<Row> sourceContext) throws Exception {
-        if (source instanceof DynamicRowType) {
-            DynamicRowType<?> dynamicRowType = (DynamicRowType<?>) source;
-            internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE, dynamicRowType::getDynamicRowType));
-        } else {
-            internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), source.getProducedType()));
-        }
+        internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), sourceStatistics));
+
         // Wait for a checkpoint to complete:
         // In the current version(version < 1.14.0), when the operator state of the source changes to FINISHED, jobs cannot be checkpoint executed.
         final long prevCheckpointId = latestTriggerCheckpointId.get();
@@ -101,6 +104,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @Override
     public void close() throws Exception {
         cancel();
+        this.sourceStatistics.close();
         LOG.debug("Close the SeaTunnelSourceFunction of Flink.");
     }
 
@@ -170,4 +174,5 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     public SeaTunnelSource<SeaTunnelRow, ?, ?> getSource() {
         return source;
     }
+
 }

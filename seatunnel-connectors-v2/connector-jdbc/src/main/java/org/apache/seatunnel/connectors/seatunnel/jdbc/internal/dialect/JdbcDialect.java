@@ -17,20 +17,16 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect;
 
-import static java.lang.String.format;
-
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceOptions;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.connection.SimpleJdbcConnectionProvider;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
 
 import java.io.Serializable;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Optional;
+import java.sql.*;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.lang.String.format;
 
 /**
  * Represents a dialect of SQL implemented by a particular JDBC system. Dialects should be immutable
@@ -63,7 +59,6 @@ public interface JdbcDialect extends Serializable {
 
     /**
      * Quotes the identifier for table name or field name
-     *
      */
     default String quoteIdentifier(String identifier) {
         return identifier;
@@ -82,13 +77,13 @@ public interface JdbcDialect extends Serializable {
      */
     default String getInsertIntoStatement(String tableName, String[] fieldNames) {
         String columns = Arrays.stream(fieldNames)
-            .map(this::quoteIdentifier)
-            .collect(Collectors.joining(", "));
+                .map(this::quoteIdentifier)
+                .collect(Collectors.joining(", "));
         String placeholders = Arrays.stream(fieldNames)
-            .map(fieldName -> "?")
-            .collect(Collectors.joining(", "));
+                .map(fieldName -> "?")
+                .collect(Collectors.joining(", "));
         return String.format("INSERT INTO %s (%s) VALUES (%s)",
-            quoteIdentifier(tableName), columns, placeholders);
+                quoteIdentifier(tableName), columns, placeholders);
     }
 
     /**
@@ -104,13 +99,13 @@ public interface JdbcDialect extends Serializable {
      */
     default String getUpdateStatement(String tableName, String[] fieldNames, String[] conditionFields) {
         String setClause = Arrays.stream(fieldNames)
-            .map(fieldName -> String.format("%s = ?", quoteIdentifier(fieldName)))
-            .collect(Collectors.joining(", "));
+                .map(fieldName -> String.format("%s = ?", quoteIdentifier(fieldName)))
+                .collect(Collectors.joining(", "));
         String conditionClause = Arrays.stream(conditionFields)
-            .map(fieldName -> String.format("%s = ?", quoteIdentifier(fieldName)))
-            .collect(Collectors.joining(" AND "));
+                .map(fieldName -> String.format("%s = ?", quoteIdentifier(fieldName)))
+                .collect(Collectors.joining(" AND "));
         return String.format("UPDATE %s SET %s WHERE %s",
-            quoteIdentifier(tableName), setClause, conditionClause);
+                quoteIdentifier(tableName), setClause, conditionClause);
     }
 
     /**
@@ -126,10 +121,10 @@ public interface JdbcDialect extends Serializable {
      */
     default String getDeleteStatement(String tableName, String[] conditionFields) {
         String conditionClause = Arrays.stream(conditionFields)
-            .map(fieldName -> format("%s = ?", quoteIdentifier(fieldName)))
-            .collect(Collectors.joining(" AND "));
+                .map(fieldName -> format("%s = ?", quoteIdentifier(fieldName)))
+                .collect(Collectors.joining(" AND "));
         return String.format("DELETE FROM %s WHERE %s",
-            quoteIdentifier(tableName), conditionClause);
+                quoteIdentifier(tableName), conditionClause);
     }
 
     /**
@@ -144,16 +139,16 @@ public interface JdbcDialect extends Serializable {
      */
     default String getRowExistsStatement(String tableName, String[] conditionFields) {
         String fieldExpressions = Arrays.stream(conditionFields)
-            .map(field -> format("%s = ?", quoteIdentifier(field)))
-            .collect(Collectors.joining(" AND "));
+                .map(field -> format("%s = ?", quoteIdentifier(field)))
+                .collect(Collectors.joining(" AND "));
         return String.format("SELECT 1 FROM %s WHERE %s",
-            quoteIdentifier(tableName), fieldExpressions);
+                quoteIdentifier(tableName), fieldExpressions);
     }
 
     /**
      * Constructs the dialects upsert statement if supported; such as MySQL's {@code DUPLICATE KEY
      * UPDATE}, or PostgreSQL's {@code ON CONFLICT... DO UPDATE SET..}.
-     *
+     * <p>
      * If supported, the returned string will be used as a {@link java.sql.PreparedStatement}.
      * Fields in the statement must be in the same order as the {@code fieldNames} parameter.
      *
@@ -161,7 +156,6 @@ public interface JdbcDialect extends Serializable {
      * {@code SELECT ROW Exists} + {@code UPDATE}/{@code INSERT} which may have poor performance.
      *
      * @return the dialects {@code UPSERT} statement or {@link Optional#empty()}.
-     *
      */
     Optional<String> getUpsertStatement(String tableName, String[] fieldNames, String[] uniqueKeyFields);
 
@@ -179,8 +173,42 @@ public interface JdbcDialect extends Serializable {
     }
 
     default ResultSetMetaData getResultSetMetaData(Connection conn, JdbcSourceOptions jdbcSourceOptions) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(jdbcSourceOptions.getQuery());
+        PreparedStatement ps = conn.prepareStatement(String.format("SELECT * FROM ( %s ) T1 WHERE 1=0", jdbcSourceOptions.getQuery()));
         return ps.getMetaData();
+    }
+
+    default List<String> listDatabase(Connection conn, JdbcSourceOptions jdbcSourceOptions) throws SQLException {
+        String listDbsSql = "show databases";
+        try (ResultSet rs = conn.createStatement().executeQuery(listDbsSql)) {
+            List<Map<String, Object>> list = SimpleJdbcConnectionProvider.getList(rs);
+            List<String> dbs = list.stream()
+                    .flatMap(x -> x.entrySet().stream()
+                            .map(Map.Entry::getValue)
+                            .filter(Objects::nonNull)
+                            .map(Object::toString)
+                    ).distinct()
+                    .collect(Collectors.toList());
+            return dbs;
+        }
+    }
+
+    default List<String> listTables(Connection conn, JdbcSourceOptions jdbcSourceOptions, String db) throws SQLException {
+        String useDbSql = "use " + db;
+        Statement statement = conn.createStatement();
+        statement.execute(useDbSql);
+        String listTabsSql = "show tables";
+        try (ResultSet rs = statement.executeQuery(listTabsSql)) {
+            List<Map<String, Object>> list = SimpleJdbcConnectionProvider.getList(rs);
+            List<String> dbTabs = list.stream()
+                    .flatMap(x -> x.entrySet().stream()
+                            .map(Map.Entry::getValue)
+                            .filter(Objects::nonNull)
+                            .map(Object::toString)
+                            .map(y -> y)
+                    ).distinct()
+                    .collect(Collectors.toList());
+            return dbTabs;
+        }
     }
 
 }

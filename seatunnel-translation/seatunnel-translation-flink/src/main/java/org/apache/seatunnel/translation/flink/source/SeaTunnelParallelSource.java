@@ -17,29 +17,29 @@
 
 package org.apache.seatunnel.translation.flink.source;
 
-import org.apache.seatunnel.api.source.SeaTunnelSource;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.translation.source.BaseSourceFunction;
-import org.apache.seatunnel.translation.source.ParallelSource;
-
 import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
+import org.apache.seatunnel.translation.source.BaseSourceFunction;
+import org.apache.seatunnel.translation.source.ParallelSource;
 
 public class SeaTunnelParallelSource extends BaseSeaTunnelSourceFunction implements ParallelSourceFunction<Row> {
 
     protected static final String PARALLEL_SOURCE_STATE_NAME = "parallel-source-states";
 
-    public SeaTunnelParallelSource(SeaTunnelSource<SeaTunnelRow, ?, ?> source) {
+    public SeaTunnelParallelSource(SeaTunnelSource<SeaTunnelRow, ?, ?> source, Config sourceCfg) {
         // TODO: Make sure the source is uncoordinated.
-        super(source);
+        super(source, sourceCfg);
     }
 
     @Override
     protected BaseSourceFunction<SeaTunnelRow> createInternalSource() {
         return new ParallelSource<>(source,
-            restoredState,
-            getRuntimeContext().getNumberOfParallelSubtasks(),
-            getRuntimeContext().getIndexOfThisSubtask());
+                restoredState,
+                getRuntimeContext().getNumberOfParallelSubtasks(),
+                getRuntimeContext().getIndexOfThisSubtask());
     }
 
     @Override

@@ -43,7 +43,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 public class ParallelSource<T, SplitT extends SourceSplit, StateT extends Serializable> implements BaseSourceFunction<T> {
     private static final Logger LOG = LoggerFactory.getLogger(ParallelSource.class);
 
-    protected final SeaTunnelSource<T, SplitT, StateT> source;
+    public final SeaTunnelSource<T, SplitT, StateT> source;
     protected final ParallelEnumeratorContext<SplitT> parallelEnumeratorContext;
     protected final ParallelReaderContext readerContext;
     protected final Integer subtaskId;

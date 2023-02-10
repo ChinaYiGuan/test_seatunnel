@@ -19,34 +19,25 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.source;
 
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceOptions;
-import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.split.JdbcNumericBetweenParametersProvider;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.JdbcSourceState;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 
 public class JdbcSourceSplitEnumerator implements SourceSplitEnumerator<JdbcSourceSplit, JdbcSourceState> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceSplitEnumerator.class);
     private final SourceSplitEnumerator.Context<JdbcSourceSplit> enumeratorContext;
-
     private final Map<Integer, Set<JdbcSourceSplit>> pendingSplits;
-
     private JdbcSourceOptions jdbcSourceOptions;
-    private final PartitionParameter partitionParameter;
+    private final Function<Integer, List<JdbcSourceSplit>> splitFunction;
 
-    public JdbcSourceSplitEnumerator(SourceSplitEnumerator.Context<JdbcSourceSplit> enumeratorContext, JdbcSourceOptions jdbcSourceOptions, PartitionParameter partitionParameter) {
+    public JdbcSourceSplitEnumerator(Context<JdbcSourceSplit> enumeratorContext, JdbcSourceOptions jdbcSourceOptions, Function<Integer, List<JdbcSourceSplit>> splitFunction) {
         this.enumeratorContext = enumeratorContext;
         this.jdbcSourceOptions = jdbcSourceOptions;
-        this.partitionParameter = partitionParameter;
+        this.splitFunction = splitFunction;
         this.pendingSplits = new HashMap<>();
     }
 
@@ -61,38 +52,27 @@ public class JdbcSourceSplitEnumerator implements SourceSplitEnumerator<JdbcSour
         assignPendingSplits();
     }
 
+
     private void discoverySplits() {
-        List<JdbcSourceSplit> allSplit = new ArrayList<>();
         LOG.info("Starting to calculate splits.");
-        if (null != partitionParameter) {
-            int partitionNumber = partitionParameter.getPartitionNumber() != null ?
-                partitionParameter.getPartitionNumber() : enumeratorContext.currentParallelism();
-            JdbcNumericBetweenParametersProvider jdbcNumericBetweenParametersProvider =
-                new JdbcNumericBetweenParametersProvider(partitionParameter.minValue, partitionParameter.maxValue)
-                    .ofBatchNum(partitionNumber);
-            Serializable[][] parameterValues = jdbcNumericBetweenParametersProvider.getParameterValues();
-            for (int i = 0; i < parameterValues.length; i++) {
-                allSplit.add(new JdbcSourceSplit(parameterValues[i], i));
-            }
-        } else {
-            allSplit.add(new JdbcSourceSplit(null, 0));
-        }
         int numReaders = enumeratorContext.currentParallelism();
+        List<JdbcSourceSplit> allSplit = splitFunction.apply(numReaders);
         for (JdbcSourceSplit split : allSplit) {
             int ownerReader = split.splitId % numReaders;
             pendingSplits.computeIfAbsent(ownerReader, r -> new HashSet<>())
-                .add(split);
+                    .add(split);
         }
         LOG.debug("Assigned {} to {} readers.", allSplit, numReaders);
         LOG.info("Calculated splits successfully, the size of splits is {}.", allSplit.size());
     }
+
 
     private void assignPendingSplits() {
         // Check if there's any pending splits for given readers
         for (int pendingReader : enumeratorContext.registeredReaders()) {
             // Remove pending assignment for the reader
             final Set<JdbcSourceSplit> pendingAssignmentForReader =
-                pendingSplits.remove(pendingReader);
+                    pendingSplits.remove(pendingReader);
 
             if (pendingAssignmentForReader != null && !pendingAssignmentForReader.isEmpty()) {
                 // Assign pending splits to reader
@@ -105,7 +85,6 @@ public class JdbcSourceSplitEnumerator implements SourceSplitEnumerator<JdbcSour
 
     @Override
     public void close() throws IOException {
-        // nothing
     }
 
     @Override

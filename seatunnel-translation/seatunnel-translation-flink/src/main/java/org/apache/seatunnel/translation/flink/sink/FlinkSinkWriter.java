@@ -17,12 +17,14 @@
 
 package org.apache.seatunnel.translation.flink.sink;
 
+import org.apache.flink.api.connector.sink.SinkWriter;
+import org.apache.flink.types.Row;
+import org.apache.seatunnel.api.common.DynamicRowType;
+import org.apache.seatunnel.api.sink.SeaTunnelSink;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.translation.flink.serialization.FlinkRowConverter;
-
-import org.apache.flink.api.connector.sink.SinkWriter;
-import org.apache.flink.types.Row;
+import org.apache.seatunnel.translation.flink.statistics.SinkStatistics;
 
 import java.io.IOException;
 import java.io.InvalidClassException;
@@ -37,27 +39,29 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
     private final org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter;
     private final FlinkRowConverter rowSerialization;
     private long checkpointId;
+    private final SinkStatistics sinkStatistics;
 
     FlinkSinkWriter(org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter,
                     long checkpointId,
-                    SeaTunnelDataType<?> dataType) {
+                    SinkStatistics sinkStatistics) {
         this.sinkWriter = sinkWriter;
         this.checkpointId = checkpointId;
-        this.rowSerialization = new FlinkRowConverter(dataType);
-    }
+        this.sinkStatistics = sinkStatistics;
 
-    FlinkSinkWriter(org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter,
-                    long checkpointId,
-                    SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> getConsumedTypeFunction) {
-        this.sinkWriter = sinkWriter;
-        this.checkpointId = checkpointId;
-        this.rowSerialization = new FlinkRowConverter(dataType,getConsumedTypeFunction);
+        SeaTunnelSink<SeaTunnelRow, ?, ?, ?> sinkStatisticsPlugin = sinkStatistics.getPlugin();
+        Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction = null;
+        if (sinkStatisticsPlugin instanceof DynamicRowType) {
+            dynamicRowTypeFunction = ((DynamicRowType<?>) sinkStatisticsPlugin)::getDynamicRowType;
+        }
+        this.rowSerialization = new FlinkRowConverter(sinkStatisticsPlugin.getConsumedType(), dynamicRowTypeFunction);
     }
 
     @Override
     public void write(InputT element, org.apache.flink.api.connector.sink.SinkWriter.Context context) throws IOException {
         if (element instanceof Row) {
-            sinkWriter.write(rowSerialization.reconvert((Row) element));
+            Row record = (Row) element;
+            this.sinkStatistics.statistics(record);
+            sinkWriter.write(rowSerialization.reconvert(record));
         } else {
             throw new InvalidClassException("only support Flink Row at now, the element Class is " + element.getClass());
         }
@@ -80,5 +84,6 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
     @Override
     public void close() throws Exception {
         sinkWriter.close();
+        this.sinkStatistics.close();
     }
 }

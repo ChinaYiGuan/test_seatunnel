@@ -18,6 +18,7 @@
 package org.apache.seatunnel.connectors.doris.sink;
 
 import com.google.auto.service.AutoService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.seatunnel.api.common.DynamicRowType;
@@ -47,6 +48,7 @@ import java.util.stream.Collectors;
 import static org.apache.seatunnel.connectors.doris.config.SinkConfig.*;
 
 @AutoService(SeaTunnelSink.class)
+@Slf4j
 public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements DynamicRowType<SeaTunnelRow> {
 
     private Config pluginConfig;
@@ -54,7 +56,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
     private DorisRestUtil restUtil;
     private String db;
     private String tab;
-    private String tabOrPrefix;
+    private String tabPrefix;
 
     private final Map<String, SeaTunnelRowType> tsfTypes = new LinkedHashMap<>();
 
@@ -75,7 +77,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
         }
         this.db = pluginConfig.getString(DATABASE.key());
         this.tab = pluginConfig.hasPath(TABLE.key()) ? pluginConfig.getString(TABLE.key()) : null;
-        this.tabOrPrefix = StringUtils.isNotBlank(tab) ? tab : pluginConfig.getString(TABLE_PREFIX.key());
+        this.tabPrefix = pluginConfig.hasPath(TABLE_PREFIX.key()) ? pluginConfig.getString(TABLE_PREFIX.key()) : null;
 
         String user = pluginConfig.getString(USERNAME.key());
         String pass = pluginConfig.getString(PASSWORD.key());
@@ -100,7 +102,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
 
     @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context) {
-        if (StringUtils.isBlank(tab)) {
+        if (StringUtils.isNotBlank(tab)) {
             tsfTypes.put(tab, seaTunnelRowType);
         }
         return new DorisSinkWriter(pluginConfig, tsfTypes);
@@ -109,7 +111,8 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
     @Override
     public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
         if (tsfTypes.containsKey(identifier)) return tsfTypes.get(identifier);
-        SchemaResp schemaResp = restUtil.querySchema(db, tabOrPrefix + identifier);
+        String tableFullName = StringUtils.isNotBlank(tab) ? tab : tabPrefix + identifier;
+        SchemaResp schemaResp = restUtil.querySchema(db, tableFullName);
         if (schemaResp != null && schemaResp.getProperties() != null) {
             List<Pair<String, ? extends SeaTunnelDataType<?>>> nameTypePairList = schemaResp.getProperties()
                     .stream()
@@ -122,6 +125,8 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
             SeaTunnelRowType ty = new SeaTunnelRowType(names, seaTunnelDataTypes);
             tsfTypes.put(identifier, ty);
             return ty;
+        } else {
+            log.warn("get doris table schema err. tab:{}", tab);
         }
         return null;
     }

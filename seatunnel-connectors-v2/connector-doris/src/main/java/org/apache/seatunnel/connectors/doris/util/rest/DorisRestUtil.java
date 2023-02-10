@@ -46,6 +46,7 @@ public class DorisRestUtil implements Serializable {
             T data = JSON.parseObject(dataObj.toString(), clazz);
             return data;
         }
+        log.error("http resp json convert err:{}", in.getOrDefault("data", "not data key"));
         return null;
     }
 
@@ -59,14 +60,10 @@ public class DorisRestUtil implements Serializable {
         return TryUtil.invoke((x) -> {
             HttpHelper httpHelper = new HttpHelper();
             String url = urlPrefix + String.format("/api/%s/%s/_schema", db, tab);
-            System.out.println(url);
             Map<String, String> headers = new HashMap<>();
             if (StringUtils.isNotBlank(pass) && StringUtils.isNotBlank(user))
                 headers.put(HttpHeaders.AUTHORIZATION, basicAuthHeader(user, pass));
             Map<String, Object> resp = httpHelper.doHttpGet(url, headers);
-            if (resp != null && resp.containsKey("code") && Integer.parseInt(resp.get("code").toString()) == 0) {
-
-            }
             return jsonConvertObj(resp, SchemaResp.class);
         }, e -> {
         }, TRY_COUNT, TRY_TIMEMS, Collections.emptyList());

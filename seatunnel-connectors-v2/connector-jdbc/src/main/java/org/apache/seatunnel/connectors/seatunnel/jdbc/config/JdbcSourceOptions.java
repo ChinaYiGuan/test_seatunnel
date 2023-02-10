@@ -19,6 +19,7 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.config;
 
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcConfig.buildJdbcConnectionOptions;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.options.JdbcConnectionOptions;
 
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
@@ -27,7 +28,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
@@ -39,6 +43,8 @@ public class JdbcSourceOptions implements Serializable {
     private Long partitionLowerBound;
     private int fetchSize = JdbcConfig.FETCH_SIZE.defaultValue();
     private Integer partitionNumber;
+    private boolean autoPartition = Boolean.FALSE;
+    private List<String> tables;
 
     public JdbcSourceOptions(Config config) {
         this.jdbcConnectionOptions = buildJdbcConnectionOptions(config);
@@ -57,6 +63,15 @@ public class JdbcSourceOptions implements Serializable {
         }
         if (config.hasPath(JdbcConfig.FETCH_SIZE.key())) {
             this.fetchSize = config.getInt(JdbcConfig.FETCH_SIZE.key());
+        }
+        if (config.hasPath(JdbcConfig.AUTO_PARTITION.key())) {
+            this.autoPartition = config.getBoolean(JdbcConfig.AUTO_PARTITION.key());
+        }
+        if (config.hasPath(JdbcConfig.TABLES.key())) {
+            this.tables = Arrays.stream(config.getString(JdbcConfig.TABLES.key()).split(","))
+                    .filter(StringUtils::isNotBlank)
+                    .map(String::trim)
+                    .collect(Collectors.toList());
         }
     }
 

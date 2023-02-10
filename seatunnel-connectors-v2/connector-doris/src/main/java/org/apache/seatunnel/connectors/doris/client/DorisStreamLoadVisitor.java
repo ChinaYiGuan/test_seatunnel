@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -121,6 +122,7 @@ public class DorisStreamLoadVisitor {
     }
 
     private byte[] joinRows(List<byte[]> rows, int totalBytes) {
+        totalBytes = Math.max(totalBytes, rows.stream().filter(Objects::nonNull).map(x -> x.length).reduce(0, Integer::sum));
         if (SinkConfig.StreamLoadFormat.CSV.equals(sinkConfig.getLoadFormat())) {
             Map<String, String> props = sinkConfig.getStreamLoadProps();
             byte[] lineDelimiter = DelimiterParserUtil.parse((String) props.get("row_delimiter"), "\n").getBytes(StandardCharsets.UTF_8);

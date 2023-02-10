@@ -19,10 +19,15 @@ package org.apache.seatunnel.translation.flink.source;
 
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.source.Collector;
+import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.common.constants.CollectionConstants;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.translation.flink.serialization.FlinkRowConverter;
+import org.apache.seatunnel.translation.flink.statistics.SourceStatistics;
 
 import java.io.IOException;
 import java.util.function.Function;
@@ -32,24 +37,30 @@ public class RowCollector implements Collector<SeaTunnelRow> {
     protected final SourceFunction.SourceContext<Row> internalCollector;
     protected final FlinkRowConverter rowSerialization;
     protected final Object checkpointLock;
+    protected final SourceStatistics sourceStatistics;
 
-    public RowCollector(SourceFunction.SourceContext<Row> internalCollector, Object checkpointLock, SeaTunnelDataType<?> dataType) {
+    public RowCollector(SourceFunction.SourceContext<Row> internalCollector, Object checkpointLock, SourceStatistics sourceStatistics) {
         this.internalCollector = internalCollector;
         this.checkpointLock = checkpointLock;
-        this.rowSerialization = new FlinkRowConverter(dataType);
-    }
+        this.sourceStatistics = sourceStatistics;
 
-    public RowCollector(SourceFunction.SourceContext<Row> internalCollector, Object checkpointLock, SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
-        this.internalCollector = internalCollector;
-        this.checkpointLock = checkpointLock;
-        this.rowSerialization = new FlinkRowConverter(dataType, dynamicRowTypeFunction);
+        Config config = sourceStatistics.getConfig();
+        SeaTunnelSource<SeaTunnelRow, ?, ?> sourceStatisticsPlugin = sourceStatistics.getPlugin();
+        Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction = null;
+        boolean isMultipleFormat = config != null && config.hasPath(CollectionConstants.IS_MULTIPLE_FORMAT_KEY) && config.getBoolean(CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
+        if (isMultipleFormat && sourceStatisticsPlugin instanceof DynamicRowType) {
+            dynamicRowTypeFunction = ((DynamicRowType<?>) sourceStatisticsPlugin)::getDynamicRowType;
+        }
+        this.rowSerialization = new FlinkRowConverter(sourceStatisticsPlugin.getProducedType(), dynamicRowTypeFunction);
     }
 
 
     @Override
     public void collect(SeaTunnelRow record) {
         try {
-            internalCollector.collect(rowSerialization.convert(record));
+            Row convert = rowSerialization.convert(record);
+            internalCollector.collect(convert);
+            sourceStatistics.statistics(convert);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

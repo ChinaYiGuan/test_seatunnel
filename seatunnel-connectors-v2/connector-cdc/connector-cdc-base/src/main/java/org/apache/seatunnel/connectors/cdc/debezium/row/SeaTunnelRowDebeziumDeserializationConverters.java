@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
+import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
 import io.debezium.time.*;
@@ -121,8 +123,12 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
         for (int i = 0; i < metadataConverters.length; i++) {
             row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
         }
-        String[] split = record.topic().split("\\.");
-        row.setIdentifier(split.length == 3 ? split[2] : record.topic());
+        Struct messageStruct = (Struct) record.value();
+        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+        String tableName = sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+        //String[] split = record.topic().split("\\.");
+        //row.setIdentifier(split.length == 3 ? split[2] : record.topic());
+        row.setIdentifier(tableName);
         return row;
     }
 

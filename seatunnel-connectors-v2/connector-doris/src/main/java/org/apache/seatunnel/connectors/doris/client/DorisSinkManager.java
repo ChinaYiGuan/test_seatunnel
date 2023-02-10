@@ -20,8 +20,8 @@ package org.apache.seatunnel.connectors.doris.client;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.doris.config.SinkConfig;
 import org.apache.seatunnel.connectors.doris.domain.Record;
@@ -107,12 +107,13 @@ public class DorisSinkManager {
             return;
         }
         Map<String, List<Record>> groupBatchMap = batchList.stream()
-                .collect(Collectors.groupingBy(x -> StringUtils.isNotBlank(x.getIdentifier()) ? sinkConfig.getTablePrefix() + x.getIdentifier() : sinkConfig.getTable()));
+                .collect(Collectors.groupingBy(x -> StringUtils.isNotBlank(sinkConfig.getTable()) ? sinkConfig.getTable() : sinkConfig.getTablePrefix() + x.getIdentifier()));
 
         for (Iterator<Map.Entry<String, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<String, List<Record>> entry = it.next();
             String table = entry.getKey();
             List<Record> groupList = entry.getValue();
+            if (StringUtils.isBlank(table) || CollectionUtils.isEmpty(groupList)) continue;
             String label = createBatchLabel(table);
             long groupByteSize = groupList.stream()
                     .map(Record::getDataJson)
