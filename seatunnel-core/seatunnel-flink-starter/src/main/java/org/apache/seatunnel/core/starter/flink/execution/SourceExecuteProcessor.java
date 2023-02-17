@@ -76,8 +76,7 @@ public class SourceExecuteProcessor extends AbstractPluginExecuteProcessor<SeaTu
             DataStreamSource<Row> sourceStream = addSource(executionEnvironment,
                     sourceFunction,
                     "SeaTunnel " + internalSource.getClass().getSimpleName(),
-                    internalSource.getBoundedness() == org.apache.seatunnel.api.source.Boundedness.BOUNDED,
-                    pluginConfig);
+                    internalSource.getBoundedness() == org.apache.seatunnel.api.source.Boundedness.BOUNDED);
             if (pluginConfig.hasPath(SourceCommonOptions.PARALLELISM.key())) {
                 int parallelism = pluginConfig.getInt(SourceCommonOptions.PARALLELISM.key());
                 sourceStream.setParallelism(parallelism);
@@ -92,12 +91,11 @@ public class SourceExecuteProcessor extends AbstractPluginExecuteProcessor<SeaTu
             final StreamExecutionEnvironment streamEnv,
             final BaseSeaTunnelSourceFunction function,
             final String sourceName,
-            boolean bounded,
-            Config config) {
+            boolean bounded) {
         checkNotNull(function);
         checkNotNull(sourceName);
         checkNotNull(bounded);
-
+        Config config = function.getSourceCfg();
         TypeInformation<Row> resolvedTypeInfo = function.getProducedType();
         if (function.getSource() instanceof DynamicRowType) {
             boolean isMultipleFormat = config != null && config.hasPath(CollectionConstants.IS_MULTIPLE_FORMAT_KEY) && config.getBoolean(CollectionConstants.IS_MULTIPLE_FORMAT_KEY);

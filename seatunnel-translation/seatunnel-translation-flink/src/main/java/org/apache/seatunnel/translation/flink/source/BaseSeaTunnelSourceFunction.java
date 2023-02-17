@@ -175,4 +175,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
         return source;
     }
 
+    public Config getSourceCfg() {
+        return sourceCfg;
+    }
 }
