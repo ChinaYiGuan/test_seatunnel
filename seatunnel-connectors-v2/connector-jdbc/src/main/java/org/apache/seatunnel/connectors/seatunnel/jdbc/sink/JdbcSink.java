@@ -17,7 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
-import org.apache.commons.lang3.StringUtils;
+import com.google.auto.service.AutoService;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.serialization.DefaultSerializer;
@@ -28,6 +28,7 @@ import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.connectors.seatunnel.common.util.ElParseUtil;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSinkOptions;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.connection.SimpleJdbcConnectionProvider;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
@@ -35,19 +36,14 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDiale
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.JdbcAggregatedCommitInfo;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.JdbcSinkState;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.XidInfo;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
-import com.google.auto.service.AutoService;
-
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @AutoService(SeaTunnelSink.class)
 public class JdbcSink
-    implements SeaTunnelSink<SeaTunnelRow, JdbcSinkState, XidInfo, JdbcAggregatedCommitInfo> {
+        implements SeaTunnelSink<SeaTunnelRow, JdbcSinkState, XidInfo, JdbcAggregatedCommitInfo> {
 
     private Config pluginConfig;
 
@@ -58,6 +54,11 @@ public class JdbcSink
     private JdbcSinkOptions jdbcSinkOptions;
 
     private JdbcDialect dialect;
+
+    private final Map<String, SeaTunnelRowType> seaTunnelRowTypeMap = new LinkedHashMap<>();
+    private String tab;
+    private String tabEl;
+
     @Override
     public String getPluginName() {
         return "Jdbc";
@@ -65,31 +66,33 @@ public class JdbcSink
 
     @Override
     public void prepare(Config pluginConfig)
-        throws PrepareFailException {
+            throws PrepareFailException {
         this.pluginConfig = pluginConfig;
         this.jdbcSinkOptions = new JdbcSinkOptions(this.pluginConfig);
+        this.tab = jdbcSinkOptions.getTable();
+        this.tabEl = jdbcSinkOptions.getTableEl();
         this.dialect = JdbcDialectLoader.load(jdbcSinkOptions.getJdbcConnectionOptions().getUrl());
     }
 
     @Override
     public SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> createWriter(SinkWriter.Context context)
-        throws IOException {
+            throws IOException {
         SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> sinkWriter;
         if (jdbcSinkOptions.isExactlyOnce()) {
             sinkWriter = new JdbcExactlyOnceSinkWriter(
-                context,
-                jobContext,
-                dialect,
-                jdbcSinkOptions,
-                seaTunnelRowType,
-                new ArrayList<>()
+                    context,
+                    jobContext,
+                    dialect,
+                    jdbcSinkOptions,
+                    seaTunnelRowTypeMap,
+                    new ArrayList<>()
             );
         } else {
             sinkWriter = new JdbcSinkWriter(
-                context,
-                dialect,
-                jdbcSinkOptions,
-                seaTunnelRowType);
+                    context,
+                    dialect,
+                    jdbcSinkOptions,
+                    seaTunnelRowTypeMap);
         }
 
         return sinkWriter;
@@ -97,15 +100,15 @@ public class JdbcSink
 
     @Override
     public SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> restoreWriter(SinkWriter.Context context, List<JdbcSinkState> states)
-        throws IOException {
+            throws IOException {
         if (jdbcSinkOptions.isExactlyOnce()) {
             return new JdbcExactlyOnceSinkWriter(
-                context,
-                jobContext,
-                dialect,
-                jdbcSinkOptions,
-                seaTunnelRowType,
-                states
+                    context,
+                    jobContext,
+                    dialect,
+                    jdbcSinkOptions,
+                    seaTunnelRowTypeMap,
+                    states
             );
         }
         return SeaTunnelSink.super.restoreWriter(context, states);
@@ -121,6 +124,7 @@ public class JdbcSink
 
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
+        seaTunnelRowTypeMap.put(tab, seaTunnelRowType);
         this.seaTunnelRowType = seaTunnelRowType;
     }
 
@@ -149,5 +153,14 @@ public class JdbcSink
             return Optional.of(new DefaultSerializer<>());
         }
         return Optional.empty();
+    }
+
+    @Override
+    public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
+        String tableFullName = ElParseUtil.parseTableFullName(tab, tabEl, identifier);
+        return seaTunnelRowTypeMap.computeIfAbsent(tableFullName, x -> {
+            SimpleJdbcConnectionProvider jdbcConnectionProvider = new SimpleJdbcConnectionProvider(jdbcSinkOptions.getJdbcConnectionOptions());
+            return jdbcConnectionProvider.getTabMeta(tableFullName);
+        });
     }
 }

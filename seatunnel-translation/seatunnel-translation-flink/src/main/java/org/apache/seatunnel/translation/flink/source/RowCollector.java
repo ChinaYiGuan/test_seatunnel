@@ -19,12 +19,11 @@ package org.apache.seatunnel.translation.flink.source;
 
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.types.Row;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.common.constants.CollectionConstants;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.translation.flink.serialization.FlinkRowConverter;
 import org.apache.seatunnel.translation.flink.statistics.SourceStatistics;
@@ -46,12 +45,10 @@ public class RowCollector implements Collector<SeaTunnelRow> {
 
         Config config = sourceStatistics.getConfig();
         SeaTunnelSource<SeaTunnelRow, ?, ?> sourceStatisticsPlugin = sourceStatistics.getPlugin();
-        Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction = null;
-        boolean isMultipleFormat = config != null && config.hasPath(CollectionConstants.IS_MULTIPLE_FORMAT_KEY) && config.getBoolean(CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
-        if (isMultipleFormat && sourceStatisticsPlugin instanceof DynamicRowType) {
-            dynamicRowTypeFunction = ((DynamicRowType<?>) sourceStatisticsPlugin)::getDynamicRowType;
-        }
-        this.rowSerialization = new FlinkRowConverter(sourceStatisticsPlugin.getProducedType(), dynamicRowTypeFunction);
+        boolean isMultiple = sourceStatisticsPlugin.isMultiple();
+        SeaTunnelDataType<SeaTunnelRow> dataType = sourceStatisticsPlugin.getProducedType();
+        Function<String, SeaTunnelDataType<?>> dataTypeFUn = sourceStatisticsPlugin::getDynamicRowType;
+        this.rowSerialization = new FlinkRowConverter(new DataTypeInfo(isMultiple, dataType, dataTypeFUn));
     }
 
 

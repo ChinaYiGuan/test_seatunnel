@@ -27,6 +27,8 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class JdbcSourceCfgMeta implements Serializable {
+    private String db;
+
     private String table;
     private String query;
 }

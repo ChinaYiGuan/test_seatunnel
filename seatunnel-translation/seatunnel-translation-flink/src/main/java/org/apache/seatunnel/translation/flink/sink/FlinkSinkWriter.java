@@ -19,8 +19,8 @@ package org.apache.seatunnel.translation.flink.sink;
 
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.types.Row;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.translation.flink.serialization.FlinkRowConverter;
@@ -49,11 +49,9 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
         this.sinkStatistics = sinkStatistics;
 
         SeaTunnelSink<SeaTunnelRow, ?, ?, ?> sinkStatisticsPlugin = sinkStatistics.getPlugin();
-        Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction = null;
-        if (sinkStatisticsPlugin instanceof DynamicRowType) {
-            dynamicRowTypeFunction = ((DynamicRowType<?>) sinkStatisticsPlugin)::getDynamicRowType;
-        }
-        this.rowSerialization = new FlinkRowConverter(sinkStatisticsPlugin.getConsumedType(), dynamicRowTypeFunction);
+        SeaTunnelDataType<SeaTunnelRow> dataType = sinkStatisticsPlugin.getConsumedType();
+        Function<String, SeaTunnelDataType<?>> dataTypeFun = sinkStatisticsPlugin::getDynamicRowType;
+        this.rowSerialization = new FlinkRowConverter(new DataTypeInfo(true, dataType, dataTypeFun));
     }
 
     @Override

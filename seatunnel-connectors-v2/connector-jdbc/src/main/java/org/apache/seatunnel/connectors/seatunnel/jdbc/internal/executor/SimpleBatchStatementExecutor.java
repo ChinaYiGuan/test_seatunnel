@@ -17,48 +17,92 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.executor;
 
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
-
+import com.mysql.cj.jdbc.ClientPreparedStatement;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.sink.TabMeta;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 @RequiredArgsConstructor
+@Slf4j
 public class SimpleBatchStatementExecutor implements JdbcBatchStatementExecutor<SeaTunnelRow> {
     @NonNull
     private final StatementFactory statementFactory;
-    @NonNull
-    private final SeaTunnelRowType rowType;
+    @NonNull //table,dataType
+    private final Function<String, TabMeta> tabMetaFun;
     @NonNull
     private final JdbcRowConverter converter;
-    private transient PreparedStatement statement;
+
+    // table,statement
+    private transient Map<String, PreparedStatement> statementMap = new HashMap<>(2);
+
+    private transient Connection connection;
 
     @Override
     public void prepareStatements(Connection connection) throws SQLException {
-        statement = statementFactory.createStatement(connection);
+        this.connection = connection;
+//        statement = statementFactory.createStatement(connection);
     }
 
     @Override
     public void addToBatch(SeaTunnelRow record) throws SQLException {
+        String identifier = Optional.ofNullable(record.getRowIdentifier()).map(RowIdentifier::getIdentifier).orElse(null);
+        SeaTunnelRowType rowType = tabMetaFun.apply(identifier).getSeaTunnelRowType();
+        PreparedStatement statement = statementMap.computeIfAbsent(identifier, x -> {
+            try {
+                PreparedStatement sts = statementFactory.createStatement(connection, identifier);
+                if (sts instanceof ClientPreparedStatement) {
+                    String q = ((ClientPreparedStatement) sts).getPreparedSql();
+                    log.info("statement identifier:{}, record size:{}, sql:{}", identifier, record.getArity(), q);
+                }
+                return sts;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        });
         converter.toExternal(rowType, record, statement);
         statement.addBatch();
     }
 
     @Override
     public void executeBatch() throws SQLException {
-        statement.executeBatch();
-        statement.clearBatch();
+        statementMap.forEach((identifier, statement) -> {
+            try {
+                if (!statement.isClosed()) {
+                    statement.executeBatch();
+                    statement.clearBatch();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     @Override
     public void closeStatements() throws SQLException {
-        if (statement != null) {
-            statement.close();
-        }
+        statementMap.forEach((identifier, statement) -> {
+            try {
+                if (!statement.isClosed()) {
+                    statement.close();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        });
     }
 }

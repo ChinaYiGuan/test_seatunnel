@@ -24,6 +24,6 @@ import java.sql.SQLException;
 @FunctionalInterface
 public interface StatementFactory {
 
-    PreparedStatement createStatement(Connection connection) throws SQLException;
+    PreparedStatement createStatement(Connection connection,String identifier) throws SQLException;
 
 }

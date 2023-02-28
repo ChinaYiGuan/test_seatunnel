@@ -30,7 +30,7 @@ import java.util.function.Function;
 
 @RequiredArgsConstructor
 public class BufferedBatchStatementExecutor implements JdbcBatchStatementExecutor<SeaTunnelRow> {
-    @NonNull
+    @NonNull //SimpleBatchStatementExecutor
     private final JdbcBatchStatementExecutor<SeaTunnelRow> statementExecutor;
     @NonNull
     private final Function<SeaTunnelRow, SeaTunnelRow> valueTransform;

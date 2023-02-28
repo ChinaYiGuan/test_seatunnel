@@ -216,7 +216,8 @@ public class JobConfigParser {
         for (Config sourceConfig : sourceConfigList) {
             ImmutablePair<SeaTunnelSource, Set<URL>> seaTunnelSourceListImmutablePair =
                 ConnectorInstanceLoader.loadSourceInstance(sourceConfig, jobConfig.getJobContext(), commonPluginJars);
-            dataType = seaTunnelSourceListImmutablePair.getLeft().getProducedType();
+            SeaTunnelSource source = seaTunnelSourceListImmutablePair.getLeft();
+            dataType = source.getDynamicProducedType(source);
             SourceAction sourceAction = createSourceAction(
                 idGenerator.getNextId(),
                 sourceConfig.getString(CollectionConstants.PLUGIN_NAME),
@@ -317,7 +318,8 @@ public class JobConfigParser {
             createSourceAction(idGenerator.getNextId(), pair.getLeft().getPluginName(), pair.getLeft(),
                 pair.getRight());
         sourceAction.setParallelism(getSourceParallelism(sourceConfigs.get(0)));
-        SeaTunnelDataType dataType = sourceAction.getSource().getProducedType();
+        SeaTunnelSource source = sourceAction.getSource();
+        SeaTunnelDataType dataType = source.getDynamicProducedType(source);
 
         Action sinkUpstreamAction = sourceAction;
 

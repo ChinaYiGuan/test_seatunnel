@@ -17,8 +17,11 @@
 
 package org.apache.seatunnel.api.sink;
 
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
+
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.WildcardType;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +43,9 @@ public interface SinkWriter<T, CommitInfoT, StateT> {
      * @throws IOException throw IOException when write data failed.
      */
     void write(T element) throws IOException;
+    default void write(T element, RowIdentifier rowIdentifier) throws IOException {
+        write(element);
+    }
 
     /**
      * prepare the commit, will be called before {@link #snapshotState(long checkpointId)}.

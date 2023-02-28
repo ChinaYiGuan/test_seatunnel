@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.LocalDateTimeUtil;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
@@ -24,15 +26,11 @@ import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
 
 import java.math.BigDecimal;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -118,7 +116,7 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
                 statement.setObject(statementIndex, null);
                 continue;
             }
-
+            Object tmpV = row.getField(fieldIndex);
             switch (seaTunnelDataType.getSqlType()) {
                 case STRING:
                     statement.setString(statementIndex, (String) row.getField(fieldIndex));
@@ -136,7 +134,15 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
                     statement.setInt(statementIndex, (Integer) row.getField(fieldIndex));
                     break;
                 case BIGINT:
-                    statement.setLong(statementIndex, (Long) row.getField(fieldIndex));
+                    Long v = null;
+                    try {
+                        v = (Long) row.getField(fieldIndex);
+                    } catch (Exception e) {
+                        if (Objects.nonNull(tmpV)) {
+                            v = Long.parseLong(tmpV.toString());
+                        }
+                    }
+                    statement.setLong(statementIndex, v);
                     break;
                 case FLOAT:
                     statement.setFloat(statementIndex, (Float) row.getField(fieldIndex));
@@ -148,15 +154,36 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
                     statement.setBigDecimal(statementIndex, (BigDecimal) row.getField(fieldIndex));
                     break;
                 case DATE:
-                    LocalDate localDate = (LocalDate) row.getField(fieldIndex);
+                    LocalDate localDate = null;
+                    try {
+                        localDate = (LocalDate) row.getField(fieldIndex);
+                    } catch (Exception e) {
+                        if (Objects.nonNull(tmpV)) {
+                            localDate = LocalDateTimeUtil.of(DateUtil.parse(tmpV.toString())).toLocalDate();
+                        }
+                    }
                     statement.setDate(statementIndex, java.sql.Date.valueOf(localDate));
                     break;
                 case TIME:
-                    LocalTime localTime = (LocalTime) row.getField(fieldIndex);
+                    LocalTime localTime = null;
+                    try {
+                        localTime = (LocalTime) row.getField(fieldIndex);
+                    } catch (Exception e) {
+                        if (Objects.nonNull(tmpV)) {
+                            localTime = LocalDateTimeUtil.of(DateUtil.parse(tmpV.toString())).toLocalTime();
+                        }
+                    }
                     statement.setTime(statementIndex, java.sql.Time.valueOf(localTime));
                     break;
                 case TIMESTAMP:
-                    LocalDateTime localDateTime = (LocalDateTime) row.getField(fieldIndex);
+                    LocalDateTime localDateTime = null;
+                    try {
+                        localDateTime = (LocalDateTime) row.getField(fieldIndex);
+                    } catch (Exception e) {
+                        if (Objects.nonNull(tmpV)) {
+                            localDateTime = LocalDateTimeUtil.of(DateUtil.parse(tmpV.toString()));
+                        }
+                    }
                     statement.setTimestamp(statementIndex, java.sql.Timestamp.valueOf(localDateTime));
                     break;
                 case BYTES:

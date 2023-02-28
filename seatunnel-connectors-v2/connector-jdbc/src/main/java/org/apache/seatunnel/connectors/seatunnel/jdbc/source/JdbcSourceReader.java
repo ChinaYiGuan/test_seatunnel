@@ -21,7 +21,6 @@ import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.source.SourceReader;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.JdbcInputFormat;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

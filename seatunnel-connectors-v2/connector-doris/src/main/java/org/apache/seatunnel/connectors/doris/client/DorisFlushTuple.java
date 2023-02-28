@@ -26,6 +26,7 @@ import java.util.List;
 @AllArgsConstructor
 @Data
 public class DorisFlushTuple {
+    private String dbName;
     private String tableName;
     private String label;
     private Long bytes;

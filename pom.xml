@@ -167,6 +167,7 @@
         <commons-compress.version>1.20</commons-compress.version>
         <protostuff.version>1.8.0</protostuff.version>
         <fastjson2.version>2.0.23</fastjson2.version>
+        <hutool.version>5.8.12</hutool.version>
         <spark.scope>provided</spark.scope>
         <flink.scope>provided</flink.scope>
         <codec.version>1.13</codec.version>
@@ -511,6 +512,11 @@
                 <artifactId>fastjson2</artifactId>
                 <version>${fastjson2.version}</version>
             </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
             <!-- mvn repository deps -->
 
         </dependencies>
@@ -566,6 +572,11 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
         </dependency>
 
     </dependencies>

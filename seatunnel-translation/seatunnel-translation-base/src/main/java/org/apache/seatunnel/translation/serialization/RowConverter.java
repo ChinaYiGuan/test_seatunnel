@@ -19,7 +19,7 @@ package org.apache.seatunnel.translation.serialization;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.*;
 
 import java.io.IOException;
@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * Conversion between {@link SeaTunnelRow} & engine's row.
@@ -37,43 +36,43 @@ import java.util.function.Function;
  */
 public abstract class RowConverter<T> {
 
-    protected final SeaTunnelDataType<?> dataType;
 
-    private static final Cache<String, SeaTunnelRowType> DYNAMIC_ROW_TYPE_CACHE = CacheBuilder.newBuilder()
+    private final Cache<String, SeaTunnelDataType<?>> DYNAMIC_ROW_TYPE_CACHE = CacheBuilder.newBuilder()
             .concurrencyLevel(4) // 并发级别
             .initialCapacity(100)// 初始化容量
             .expireAfterWrite(5, TimeUnit.DAYS)//失效时间
             .maximumSize(10000)//最大容量
             .build();
+    protected final DataTypeInfo dataTypeInfo;
 
-    protected Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction;
-
-    public RowConverter(SeaTunnelDataType<?> dataType) {
-        this.dataType = dataType;
+    public RowConverter(DataTypeInfo dataTypeInfo) {
+        this.dataTypeInfo = dataTypeInfo;
     }
 
-    public RowConverter(SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
-        this.dataType = dataType;
-        this.dynamicRowTypeFunction = dynamicRowTypeFunction;
-    }
-
-    protected SeaTunnelRowType getDynamicRowType(String identifier) {
-        SeaTunnelRowType dynamicRowType = DYNAMIC_ROW_TYPE_CACHE.getIfPresent(identifier);
-        if (Objects.nonNull(dynamicRowType)) {
-            return dynamicRowType;
-        } else {
-            dynamicRowType = (SeaTunnelRowType) dynamicRowTypeFunction.apply(identifier);
+    protected final SeaTunnelDataType<?> getDataType(String identifier) {
+        SeaTunnelDataType<?> cacheDataType = DYNAMIC_ROW_TYPE_CACHE.getIfPresent(identifier);
+        if (Objects.nonNull(cacheDataType)) {
+            return cacheDataType;
         }
-        return dynamicRowType;
+        SeaTunnelDataType<?> dataType = dataTypeInfo.getDataType();
+        if (dataTypeInfo.isMultiple()) {
+            SeaTunnelDataType<?> dynamicDataType = dataTypeInfo.getDataTypeFun().apply(identifier);
+            if (dynamicDataType != null) {
+                dataType = dynamicDataType;
+                DYNAMIC_ROW_TYPE_CACHE.put(identifier, dataType);
+            }
+        }
+        return dataType;
     }
 
 
     public void validate(SeaTunnelRow seaTunnelRow) throws IOException {
+        if (dataTypeInfo.isMultiple()) {
+            return;
+        }
+        SeaTunnelDataType<?> dataType = dataTypeInfo.getDataType();
         if (!(dataType instanceof SeaTunnelRowType)) {
             throw new UnsupportedOperationException(String.format("The data type don't support validation: %s. ", dataType.getClass().getSimpleName()));
-        }
-        if (StringUtils.isNotBlank(seaTunnelRow.getIdentifier())) {
-            return;
         }
         SeaTunnelDataType<?>[] fieldTypes = ((SeaTunnelRowType) dataType).getFieldTypes();
         List<String> errors = new ArrayList<>();

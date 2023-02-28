@@ -17,12 +17,10 @@
 
 package org.apache.seatunnel.api.table.type;
 
-import org.apache.seatunnel.common.constants.CollectionConstants;
-
-import static com.google.common.base.Preconditions.checkArgument;
-
 import java.util.Arrays;
 import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
     private static final long serialVersionUID = 2L;
@@ -36,11 +34,9 @@ public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
      */
     private final SeaTunnelDataType<?>[] fieldTypes;
 
-   public static final SeaTunnelRowType DYNAMIC_TSF_ROW_TYPE = new SeaTunnelRowType(new String[]{CollectionConstants.JSON_DATA_KEY, CollectionConstants.JSON_META_KEY}, new SeaTunnelDataType[]{BasicType.STRING_TYPE, BasicType.STRING_TYPE});
-
     public SeaTunnelRowType(String[] fieldNames, SeaTunnelDataType<?>[] fieldTypes) {
         checkArgument(fieldNames.length == fieldTypes.length,
-            "The number of field names must be the same as the number of field types.");
+                "The number of field names must be the same as the number of field types.");
         this.fieldNames = fieldNames;
         this.fieldTypes = fieldTypes;
     }
@@ -116,8 +112,8 @@ public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
                 builder.append(",");
             }
             builder.append(fieldNames[i])
-                .append(" ")
-                .append(fieldTypes[i]);
+                    .append(" ")
+                    .append(fieldTypes[i]);
         }
         return builder.append(">").toString();
     }

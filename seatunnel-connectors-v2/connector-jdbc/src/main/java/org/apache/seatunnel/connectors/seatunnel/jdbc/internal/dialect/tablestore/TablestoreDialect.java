@@ -17,7 +17,6 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.tablestore;
 
-import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceOptions;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectTypeMapper;
@@ -57,8 +56,9 @@ public class TablestoreDialect implements JdbcDialect {
     }
 
     @Override
-    public ResultSetMetaData getResultSetMetaData(Connection conn, JdbcSourceOptions jdbcSourceOptions) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(jdbcSourceOptions.getQuery());
+    public ResultSetMetaData getResultSetMetaData(Connection conn, String tabOrQuery, boolean isTab) throws SQLException {
+//        PreparedStatement ps = conn.prepareStatement(jdbcSourceOptions.getQuery());
+        PreparedStatement ps = conn.prepareStatement(String.format("SELECT * FROM %s", isTab ? tabOrQuery : "( " + tabOrQuery + " ) T1"));
         return ps.executeQuery().getMetaData();
     }
 }

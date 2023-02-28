@@ -23,6 +23,7 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDiale
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 public class SqliteDialect implements JdbcDialect {
@@ -43,7 +44,12 @@ public class SqliteDialect implements JdbcDialect {
 
     @Override
     public String quoteIdentifier(String identifier) {
-        return "`" + identifier + "`";
+        String[] tokens = identifier.split("\\.");
+        StringJoiner joiner = new StringJoiner(".");
+        for (String token : tokens) {
+            joiner.add("`" + token + "`");
+        }
+        return joiner.toString();
     }
 
     @Override

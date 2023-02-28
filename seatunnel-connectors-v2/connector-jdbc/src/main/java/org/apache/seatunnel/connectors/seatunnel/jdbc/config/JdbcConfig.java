@@ -64,7 +64,7 @@ public class JdbcConfig implements Serializable {
     public static final Option<String> TRANSACTION_TIMEOUT_SEC = Options.key("transaction_timeout_sec").stringType().noDefaultValue().withDescription("transaction timeout (second)");
 
     public static final Option<String> TABLE = Options.key("table").stringType().noDefaultValue().withDescription("table");
-    public static final Option<String> TABLE_PREFIX = Options.key("table.prefix").stringType().noDefaultValue().withDescription("table prefix");
+    public static final Option<String> TABLE_EL = Options.key("table.el").stringType().noDefaultValue().withDescription("table name el");
 
     public static final Option<List<String>> PRIMARY_KEYS = Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
 

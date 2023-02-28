@@ -6,19 +6,17 @@ import com.google.auto.service.AutoService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.datasource.BaseDataSource;
 import org.apache.seatunnel.common.utils.EnvUtil;
 import org.apache.seatunnel.common.utils.JsonUtils;
+import org.apache.seatunnel.datasource.util.DesUtil;
 import org.apache.seatunnel.datasource.util.HttpHelper;
 import org.apache.seatunnel.shade.com.typesafe.config.*;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.DESKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,7 +74,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @AutoService(BaseDataSource.class)
 public class DolphinDataSource implements BaseDataSource {
-    private static String pattern = "\\$\\{\\w+}";
+    private static String pattern = "\\$\\{(.*?)}";
 
     private static final String ENV_DS_HOSTPORT_KEY = "dataSourceHost";
     private static final String ENV_DS_TOKEN_KEY = "dataSourceToken";
@@ -127,9 +125,9 @@ public class DolphinDataSource implements BaseDataSource {
                 final Map<String, Object> remoteDataSourceMap = remoteReq(dataSourceName);
                 debugShow("[" + dataSourceName + "] remoteReq parse", remoteDataSourceMap);
                 if (remoteDataSourceMap.containsKey("password")) {
-                    remoteDataSourceMap.put("password", decryptor(remoteDataSourceMap.getOrDefault("password", "").toString()));
+                    remoteDataSourceMap.put("password", DesUtil.getInstance().decryptor(remoteDataSourceMap.getOrDefault("password", "").toString()));
                 }
-                log.info("parsing completed. data source:【{}】, size:【{}】", !remoteDataSourceMap.isEmpty() ? "failed" : "success", remoteDataSourceMap.size());
+                log.info("parsing completed. data source:【{}】, size:【{}】", remoteDataSourceMap.isEmpty() ? "failed" : "success", remoteDataSourceMap.size());
                 if (!remoteDataSourceMap.isEmpty()) {
                     for (Map.Entry<String, List<String>> mapEntry : dataSourceMapping.entrySet()) {
                         final String mapKey = mapEntry.getKey();
@@ -169,33 +167,27 @@ public class DolphinDataSource implements BaseDataSource {
     private String parseVar(String content, Map<String, Object> kmMap) {
         if (StringUtils.isBlank(content) || MapUtils.isEmpty(kmMap)) return content;
         //我是：${username} -> 我是：zs
-        Pattern p = Pattern.compile(pattern);
-        Matcher m = p.matcher(content);
-        while (m.find()) {
-            String group = m.group();
-            String k = group.replaceAll(".*\\{|}.*", "");
-            String v = Objects.isNull(kmMap.get(k)) ? "" : kmMap.get(k).toString();
-            content = content.replace(group, v);
+        String elRegex = "\\$\\{(.*?)}";
+        Pattern pattern = Pattern.compile(elRegex);
+        String output = content;
+        Matcher matcher;
+        HashMap<String, String> tmpMap = new HashMap<>();
+        while ((matcher = pattern.matcher(output)).find()) {
+            //替换匹配内容
+            String elStr = matcher.group();
+            String k = matcher.group(1);
+            String defaultValue = "";
+            String v = Optional.ofNullable(kmMap.get(k)).orElse(defaultValue).toString();
+            if (!kmMap.containsKey(k)) {
+                v = UUID.randomUUID().toString() + Instant.now().toEpochMilli() + RandomUtils.nextInt(1, 9999);
+                tmpMap.put(elStr, v);
+            }
+            output = output.replace(elStr, v);
         }
-        return content;
-    }
-
-    public String decryptor(final String data) {
-        try {
-            String password = EnvUtil.getEnv("data_source_decryptor_password", "b0b822tg15d6c15b0sda08");
-            byte[] srcDataBt = Base64.getMimeDecoder().decode(data);
-            final SecureRandom random = new SecureRandom();
-            final SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
-            final SecretKey securekey = keyFactory.generateSecret(new DESKeySpec(password.getBytes(StandardCharsets.UTF_8)));
-            final Cipher cipher = Cipher.getInstance("DES");
-            cipher.init(Cipher.DECRYPT_MODE, securekey, random);
-            byte[] destDataBt = cipher.doFinal(srcDataBt);
-            return new String(destDataBt, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            e.printStackTrace();
-            log.error(e.getMessage());
+        for (Map.Entry<String, String> tmpMapEntry : tmpMap.entrySet()) {
+            output = output.replace(tmpMapEntry.getValue(), tmpMapEntry.getKey());
         }
-        return null;
+        return output;
     }
 
     private Config injectToCfg(Config cfg, Object value, String path) {

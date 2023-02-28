@@ -18,69 +18,66 @@
 package org.apache.seatunnel.translation.flink.serialization;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONReader;
 import com.alibaba.fastjson2.JSONWriter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
+import org.apache.seatunnel.api.source.SourceDynamicRowType;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
+import org.apache.seatunnel.api.table.transfrom.TsfData;
 import org.apache.seatunnel.api.table.type.*;
-import org.apache.seatunnel.common.tsf.TsfData;
-import org.apache.seatunnel.common.tsf.TsfMeta;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
 import org.apache.seatunnel.translation.serialization.RowConverter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Slf4j
 public class FlinkRowConverter extends RowConverter<Row> {
 
 
-    public FlinkRowConverter(SeaTunnelDataType<?> dataType) {
-        super(dataType);
-    }
-
-    public FlinkRowConverter(SeaTunnelDataType<?> dataType, Function<String, SeaTunnelDataType<?>> dynamicRowTypeFunction) {
-        super(dataType, dynamicRowTypeFunction);
+    public FlinkRowConverter(DataTypeInfo dataTypeInfo) {
+        super(dataTypeInfo);
     }
 
     @Override
     public Row convert(SeaTunnelRow seaTunnelRow) throws IOException {
         validate(seaTunnelRow);
-        return (Row) convert(seaTunnelRow, dataType);
+        return (Row) convert(seaTunnelRow, dataTypeInfo.getDataType(), dataTypeInfo.isMultiple(), this::getDataType);
     }
 
 
-    private Object convert(Object field, SeaTunnelDataType<?> dataType) {
+    private Object convert(Object field, SeaTunnelDataType<?> dataType, boolean isMultiple, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
         if (field == null) {
             return null;
         }
         SqlType sqlType = dataType.getSqlType();
         switch (sqlType) {
             case ROW:
-                return dynamicRowConvert((SeaTunnelRow) field, (SeaTunnelRowType) dataType);
-                /*
+                if (isMultiple) {
+                    return multipleRowConvert((SeaTunnelRow) field, dataTypeFun);
+                }
                 SeaTunnelRow seaTunnelRow = (SeaTunnelRow) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
                 int arity = rowType.getTotalFields();
                 Row engineRow = new Row(arity);
                 for (int i = 0; i < arity; i++) {
-                    engineRow.setField(i, convert(seaTunnelRow.getField(i), rowType.getFieldType(i)));
+                    engineRow.setField(i, convert(seaTunnelRow.getField(i), rowType.getFieldType(i), false, null));
                 }
                 engineRow.setKind(RowKind.fromByteValue(seaTunnelRow.getRowKind().toByteValue()));
-
-                final String identifier = seaTunnelRow.getIdentifier();
-                if (StringUtils.isNotBlank(identifier)) {
-                    Row firstRow = Row.of(identifier);
-                    return Row.join(firstRow, engineRow);
-                }
                 return engineRow;
-                 */
+
             case MAP:
-                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, this::convert);
+                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, (d, dType) -> convert(d, dType, false, null));
             default:
                 return field;
         }
@@ -106,129 +103,102 @@ public class FlinkRowConverter extends RowConverter<Row> {
 
     @Override
     public SeaTunnelRow reconvert(Row engineRow) throws IOException {
-        return (SeaTunnelRow) reconvert(engineRow, dataType);
+        return (SeaTunnelRow) reconvert(engineRow, dataTypeInfo.getDataType(), dataTypeInfo.isMultiple(), this::getDataType);
     }
 
 
-    private Object reconvert(Object field, SeaTunnelDataType<?> dataType) {
+    private Object reconvert(Object field, SeaTunnelDataType<?> dataType, boolean isMultiple, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
         if (field == null) {
             return null;
         }
         SqlType sqlType = dataType.getSqlType();
         switch (sqlType) {
             case ROW:
-                return dynamicRowReconvert((Row) field, (SeaTunnelRowType) dataType);
-/*
-
                 Row engineRow = (Row) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
+                if (isMultiple && engineRow.getArity() == 1 && engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY) != null) {
+                    return multipleRowReconvert((Row) field, dataTypeFun);
+                }
                 int arity = rowType.getTotalFields();
                 SeaTunnelRow seaTunnelRow = new SeaTunnelRow(arity);
                 for (int i = 0; i < arity; i++) {
-                    seaTunnelRow.setField(i, reconvert(engineRow.getField(i), rowType.getFieldType(i)));
+                    seaTunnelRow.setField(i, reconvert(engineRow.getField(i), rowType.getFieldType(i), false, null));
                 }
                 seaTunnelRow.setRowKind(org.apache.seatunnel.api.table.type.RowKind.fromByteValue(engineRow.getKind().toByteValue()));
                 return seaTunnelRow;
- */
+
             case MAP:
-                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, this::reconvert);
+                return convertMap((Map<?, ?>) field, (MapType<?, ?>) dataType, (d, dType) -> reconvert(d, dType, false, null));
             default:
                 return field;
         }
     }
 
-    private Row dynamicRowConvert(SeaTunnelRow seaTunnelRow, SeaTunnelRowType rowType) {
-        final String identifier = seaTunnelRow.getIdentifier();
-        boolean isDynamic = false;
-        if (StringUtils.isNotBlank(identifier) && Objects.nonNull(dynamicRowTypeFunction) && Objects.nonNull(dynamicRowTypeFunction.apply(identifier)) &&
-                Arrays.equals(rowType.getFieldNames(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldNames()) && Arrays.equals(rowType.getFieldTypes(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldTypes())
-        ) {
-            isDynamic = true;
-        }
+    private Row multipleRowConvert(SeaTunnelRow seaTunnelRow, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
+        RowIdentifier rowIdentifier = seaTunnelRow.getRowIdentifier();
+        if (rowIdentifier == null)
+            throw new RuntimeException("multiple row convert, missing rowIdentifier.");
+        String identifier = rowIdentifier.getIdentifier();
+        if (identifier == null)
+            throw new RuntimeException("multiple row convert, missing identifier.");
+        SeaTunnelRowType dynamicDataType = (SeaTunnelRowType) dataTypeFun.apply(identifier);
+        if (dynamicDataType == null)
+            throw new RuntimeException("multiple row convert, missing dynamicDataType.");
+        int arity = dynamicDataType.getTotalFields();
+        if (seaTunnelRow.getArity() < arity)
+            throw new RuntimeException("multiple row convert, data and type do not correspond.");
 
-        final int arity = rowType.getTotalFields();
-        Row engineRow;
-        if (isDynamic) {
-            SeaTunnelRowType tsfRowType = getDynamicRowType(identifier);
-            if (Objects.isNull(tsfRowType)) {
-                log.error(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
-                throw new RuntimeException(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
-            }
-            int dynamicArity = tsfRowType.getTotalFields();
-            engineRow = new Row(dynamicArity);
-            for (int i = 0; i < dynamicArity; i++) {
-                engineRow.setField(i, convert(seaTunnelRow.getField(i), tsfRowType.getFieldType(i)));
-            }
-            final List<TsfData> dataList = new ArrayList<>();
-            for (int i = 0; i < dynamicArity; i++) {
-                dataList.add(new TsfData(i + "", tsfRowType.getFieldType(i).getTypeClass().getSimpleName(), engineRow.getField(i)));
-            }
+        TsfData tsfData = new TsfData();
+        tsfData.setRowIdentifier(rowIdentifier);
+        tsfData.setData(IntStream.range(0, arity)
+                .mapToObj(x -> {
+                    String name = dynamicDataType.getTypeClass().getSimpleName();
+                    SeaTunnelDataType<?> type = dynamicDataType.getFieldType(x);
+                    Object value = seaTunnelRow.getField(x);
+                    return new TsfData.Data(name, type, value);
+                }).collect(Collectors.toList()));
 
-            final TsfMeta cvtMeta = new TsfMeta();
-            cvtMeta.setIdentifier(identifier);
-            cvtMeta.setTime(LocalDateTime.now());
-            cvtMeta.setNames(dataList.stream().map(TsfData::getName).collect(Collectors.toList()));
-            cvtMeta.setTypes(dataList.stream().map(TsfData::getType).collect(Collectors.toList()));
-
-            engineRow = Row.of(
-                    JSON.toJSONString(dataList, JSONWriter.Feature.WriteNulls),
-                    JSON.toJSONString(cvtMeta, JSONWriter.Feature.WriteNulls)
-            );
-        } else {
-            engineRow = new Row(arity);
-            for (int i = 0; i < arity; i++) {
-                engineRow.setField(i, convert(seaTunnelRow.getField(i), rowType.getFieldType(i)));
-            }
-        }
-
+        Row engineRow = Row.of(JSON.toJSONString(tsfData, JSONWriter.Feature.WriteNulls));
         engineRow.setKind(RowKind.fromByteValue(seaTunnelRow.getRowKind().toByteValue()));
-
         return engineRow;
     }
 
-    private SeaTunnelRow dynamicRowReconvert(Row engineRow, SeaTunnelRowType engineRowDataType) {
-        boolean isDynamic = false;
-        List<TsfData> tsfDataList = null;
-        TsfMeta tsfMeta = null;
-        if (Objects.nonNull(dynamicRowTypeFunction) && engineRow.getArity() == 2 &&
-                Arrays.equals(engineRowDataType.getFieldNames(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldNames()) && Arrays.equals(engineRowDataType.getFieldTypes(), SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE.getFieldTypes())) {
-            Object tsfDataJsonList = engineRow.getField(0);
-            Object tsfMetaJsonObj = engineRow.getField(1);
-            if (Objects.nonNull(tsfDataJsonList) && tsfDataJsonList instanceof String && Objects.nonNull(tsfMetaJsonObj) && tsfMetaJsonObj instanceof String) {
-                if (JSON.isValidArray(tsfDataJsonList.toString()) && JSON.isValidObject(tsfMetaJsonObj.toString())) {
-                    tsfMeta = JSON.parseObject(tsfMetaJsonObj.toString(), TsfMeta.class);
-                    if (Objects.nonNull(tsfMeta) && StringUtils.isNotBlank(tsfMeta.getIdentifier())) {
-                        tsfDataList = JSON.parseArray((String) engineRow.getField(0), TsfData.class);
-                        isDynamic = true;
-                    }
-                }
-            }
-        }
-        int arity = engineRowDataType.getTotalFields();
+    private SeaTunnelRow multipleRowReconvert(Row engineRow, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
+        Object tsfDataJson = engineRow.getField(0);
+        if (tsfDataJson == null)
+            throw new RuntimeException("multiple row reconvert, conversion data is empty.");
+        TsfData tsfData = JSON.parseObject(tsfDataJson.toString(), TsfData.class, JSONReader.Feature.SupportClassForName);
+        if (tsfData == null)
+            throw new RuntimeException("multiple row reconvert, parsing data is empty.");
+        RowIdentifier rowIdentifier = tsfData.getRowIdentifier();
+        if (rowIdentifier == null)
+            throw new RuntimeException("multiple row reconvert, missing rowIdentifier.");
+        String identifier = rowIdentifier.getIdentifier();
+        if (identifier == null)
+            throw new RuntimeException("multiple row reconvert, missing identifier.");
+        List<TsfData.Data> dataList = tsfData.getData();
+        SeaTunnelRowType dynamicDataType = (SeaTunnelRowType) dataTypeFun.apply(identifier);
+        if (dynamicDataType == null)
+            throw new RuntimeException("multiple row reconvert, dynamicDataType is empty.");
+        int arity = dynamicDataType.getTotalFields();
+        if (dataList.size() < arity)
+            throw new RuntimeException("multiple row reconvert, data and type do not correspond.");
         SeaTunnelRow seaTunnelRow = new SeaTunnelRow(arity);
-        if (isDynamic) {
-            String identifier = tsfMeta.getIdentifier();
-            SeaTunnelRowType tsfRowType = getDynamicRowType(identifier);
-            if (Objects.isNull(tsfRowType)) {
-                log.error(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
-                throw new RuntimeException(identifier + " -> The DynamicRowType subclass must implement the getDynamicRowType method!");
-            }
-            int dynamicArity = tsfRowType.getTotalFields();
-            seaTunnelRow = new SeaTunnelRow(dynamicArity);
-            seaTunnelRow.setIdentifier(identifier);
-            for (int i = 0; i < dynamicArity; i++) {
-                if (tsfDataList.size() > i) {
-                    TsfData cvtData = tsfDataList.get(i);
-                    Object value = cvtData.getValue();
-                    seaTunnelRow.setField(i, reconvert(value, tsfRowType.getFieldType(i)));
-                }
-            }
-        } else {
-            for (int i = 0; i < arity; i++) {
-                seaTunnelRow.setField(i, reconvert(engineRow.getField(i), engineRowDataType.getFieldType(i)));
-            }
-        }
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<SeaTunnelDataType<?>> types = new ArrayList<>();
+        IntStream.range(0, dataList.size()).forEach(x -> {
+            TsfData.Data data = dataList.get(x);
+            SeaTunnelDataType<?> fieldType = dynamicDataType.getFieldType(x);
+            seaTunnelRow.setField(x, reconvert(data.getValue(), fieldType, false, null));
+            names.add(data.getName());
+            types.add(data.getType());
+        });
+
+        rowIdentifier.getMetaMap().put("names",names);
+        rowIdentifier.getMetaMap().put("types",types);
+        seaTunnelRow.setRowIdentifier(rowIdentifier);
         seaTunnelRow.setRowKind(org.apache.seatunnel.api.table.type.RowKind.fromByteValue(engineRow.getKind().toByteValue()));
+
         return seaTunnelRow;
     }
 }

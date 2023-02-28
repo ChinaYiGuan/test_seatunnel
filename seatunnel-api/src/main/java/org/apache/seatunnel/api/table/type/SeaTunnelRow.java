@@ -19,6 +19,8 @@ package org.apache.seatunnel.api.table.type;
 
 import com.google.common.base.Strings;
 import org.apache.seatunnel.api.table.factory.SupportMultipleTable;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
+import org.apache.seatunnel.common.utils.JsonUtils;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -43,17 +45,9 @@ public final class SeaTunnelRow implements Serializable {
     private final Object[] fields;
 
     /**
-     * The unique identifier, usually the table name
+     * 用于dynamic row传输
      */
-    private String identifier;
-
-    public String getIdentifier() {
-        return identifier;
-    }
-
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
-    }
+    private RowIdentifier rowIdentifier;
 
     public SeaTunnelRow(int arity) {
         this.fields = new Object[arity];
@@ -95,12 +89,21 @@ public final class SeaTunnelRow implements Serializable {
         return this.fields[pos];
     }
 
+    public RowIdentifier getRowIdentifier() {
+        return rowIdentifier;
+    }
+
+    public void setRowIdentifier(RowIdentifier rowIdentifier) {
+        this.rowIdentifier = rowIdentifier;
+    }
+
     public SeaTunnelRow copy() {
         Object[] newFields = new Object[this.getArity()];
         System.arraycopy(this.getFields(), 0, newFields, 0, newFields.length);
         SeaTunnelRow newRow = new SeaTunnelRow(newFields);
         newRow.setRowKind(this.getRowKind());
         newRow.setTableId(this.getTableId());
+        newRow.setRowIdentifier(JsonUtils.parseObject(JsonUtils.toJsonString(this.getRowIdentifier()), RowIdentifier.class));
         return newRow;
     }
 
@@ -112,6 +115,7 @@ public final class SeaTunnelRow implements Serializable {
         SeaTunnelRow newRow = new SeaTunnelRow(newFields);
         newRow.setRowKind(this.getRowKind());
         newRow.setTableId(this.getTableId());
+        newRow.setRowIdentifier(JsonUtils.parseObject(JsonUtils.toJsonString(this.getRowIdentifier()), RowIdentifier.class));
         return newRow;
     }
 

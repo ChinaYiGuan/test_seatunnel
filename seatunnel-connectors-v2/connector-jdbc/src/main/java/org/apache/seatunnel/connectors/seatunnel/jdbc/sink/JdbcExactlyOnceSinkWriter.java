@@ -31,7 +31,6 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorExc
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.JdbcOutputFormat;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.JdbcOutputFormatBuilder;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
-import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.executor.JdbcBatchStatementExecutor;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.xa.XaFacade;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.xa.XaGroupOps;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.xa.XaGroupOpsImpl;
@@ -48,6 +47,7 @@ import javax.transaction.xa.Xid;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class JdbcExactlyOnceSinkWriter
@@ -66,7 +66,7 @@ public class JdbcExactlyOnceSinkWriter
 
     private final XidGenerator xidGenerator;
 
-    private final JdbcOutputFormat<SeaTunnelRow, JdbcBatchStatementExecutor<SeaTunnelRow>> outputFormat;
+    private final JdbcOutputFormat outputFormat;
 
     private transient boolean isOpen;
 
@@ -78,7 +78,7 @@ public class JdbcExactlyOnceSinkWriter
         JobContext context,
         JdbcDialect dialect,
         JdbcSinkOptions jdbcSinkOptions,
-        SeaTunnelRowType rowType,
+        Map<String, SeaTunnelRowType> seaTunnelRowTypeMap,
         List<JdbcSinkState> states) {
         checkArgument(
             jdbcSinkOptions.getJdbcConnectionOptions().getMaxRetries() == 0,
@@ -92,7 +92,7 @@ public class JdbcExactlyOnceSinkWriter
         checkState(jdbcSinkOptions.isExactlyOnce(), "is_exactly_once config error");
         this.xaFacade = XaFacade.fromJdbcConnectionOptions(
             jdbcSinkOptions.getJdbcConnectionOptions());
-        this.outputFormat = new JdbcOutputFormatBuilder(dialect, xaFacade, jdbcSinkOptions, rowType).build();
+        this.outputFormat = new JdbcOutputFormatBuilder(dialect, xaFacade, jdbcSinkOptions, seaTunnelRowTypeMap).build();
         this.xaGroupOps = new XaGroupOpsImpl(xaFacade);
     }
 
@@ -183,6 +183,7 @@ public class JdbcExactlyOnceSinkWriter
             xaFacade.endAndPrepare(currentXid);
             prepareXid = currentXid;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new JdbcConnectorException(JdbcConnectorErrorCode.XA_OPERATION_FAILED, "unable to prepare current xa transaction", e);
         }
     }

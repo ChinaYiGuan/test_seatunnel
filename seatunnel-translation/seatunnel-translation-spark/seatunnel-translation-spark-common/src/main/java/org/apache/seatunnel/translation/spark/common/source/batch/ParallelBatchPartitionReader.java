@@ -92,7 +92,7 @@ public class ParallelBatchPartitionReader {
             throw new RuntimeException("Failed to open internal source.", e);
         }
 
-        this.internalRowCollector = new InternalRowCollector(handover, checkpointLock, source.getProducedType());
+        this.internalRowCollector = new InternalRowCollector(handover, checkpointLock, source.getDynamicProducedType(source));
         executorService.execute(() -> {
             try {
                 internalSource.run(internalRowCollector);

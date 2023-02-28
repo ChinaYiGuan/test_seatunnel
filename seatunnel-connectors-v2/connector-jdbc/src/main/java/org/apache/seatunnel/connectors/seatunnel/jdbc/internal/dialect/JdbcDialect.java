@@ -17,7 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect;
 
-import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceOptions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.connection.SimpleJdbcConnectionProvider;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
 
@@ -172,12 +172,13 @@ public interface JdbcDialect extends Serializable {
         return statement;
     }
 
-    default ResultSetMetaData getResultSetMetaData(Connection conn, JdbcSourceOptions jdbcSourceOptions) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(String.format("SELECT * FROM ( %s ) T1 WHERE 1=0", jdbcSourceOptions.getQuery()));
+    default ResultSetMetaData getResultSetMetaData(Connection conn, String tabOrQuery, boolean isTab) throws SQLException {
+//        PreparedStatement ps = conn.prepareStatement(String.format("SELECT * FROM ( %s ) T1 WHERE 1=0", jdbcSourceOptions.getQuery()));
+        PreparedStatement ps = conn.prepareStatement(String.format("SELECT * FROM %s WHERE 1=0", isTab ? tabOrQuery : "( " + tabOrQuery + " ) T1"));
         return ps.getMetaData();
     }
 
-    default List<String> listDatabase(Connection conn, JdbcSourceOptions jdbcSourceOptions) throws SQLException {
+    default List<String> listDatabase(Connection conn) throws SQLException {
         String listDbsSql = "show databases";
         try (ResultSet rs = conn.createStatement().executeQuery(listDbsSql)) {
             List<Map<String, Object>> list = SimpleJdbcConnectionProvider.getList(rs);
@@ -186,13 +187,14 @@ public interface JdbcDialect extends Serializable {
                             .map(Map.Entry::getValue)
                             .filter(Objects::nonNull)
                             .map(Object::toString)
+                            .filter(StringUtils::isNotBlank)
                     ).distinct()
                     .collect(Collectors.toList());
             return dbs;
         }
     }
 
-    default List<String> listTables(Connection conn, JdbcSourceOptions jdbcSourceOptions, String db) throws SQLException {
+    default List<String> listTables(Connection conn, String db) throws SQLException {
         String useDbSql = "use " + db;
         Statement statement = conn.createStatement();
         statement.execute(useDbSql);
@@ -204,7 +206,7 @@ public interface JdbcDialect extends Serializable {
                             .map(Map.Entry::getValue)
                             .filter(Objects::nonNull)
                             .map(Object::toString)
-                            .map(y -> y)
+                            .filter(StringUtils::isNotBlank)
                     ).distinct()
                     .collect(Collectors.toList());
             return dbTabs;

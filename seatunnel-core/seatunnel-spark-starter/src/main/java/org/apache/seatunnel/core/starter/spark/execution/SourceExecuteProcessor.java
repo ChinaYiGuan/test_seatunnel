@@ -68,7 +68,7 @@ public class SourceExecuteProcessor extends AbstractPluginExecuteProcessor<SeaTu
                 .format(SeaTunnelSource.class.getSimpleName())
                 .option(SourceCommonOptions.PARALLELISM.key(), parallelism)
                 .option(Constants.SOURCE_SERIALIZATION, SerializationUtils.objectToString(source))
-                .schema((StructType) TypeConverterUtils.convert(source.getProducedType())).load();
+                .schema((StructType) TypeConverterUtils.convert(source.getDynamicProducedType(source))).load();
             sources.add(dataset);
             registerInputTempView(pluginConfigs.get(i), dataset);
         }

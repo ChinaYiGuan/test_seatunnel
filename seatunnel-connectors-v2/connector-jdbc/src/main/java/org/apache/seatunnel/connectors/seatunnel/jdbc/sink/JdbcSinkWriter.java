@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> {
@@ -49,13 +50,13 @@ public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSin
     private transient boolean isOpen;
 
     public JdbcSinkWriter(
-        SinkWriter.Context context,
-        JdbcDialect dialect,
-        JdbcSinkOptions jdbcSinkOptions,
-        SeaTunnelRowType rowType) {
+            Context context,
+            JdbcDialect dialect,
+            JdbcSinkOptions jdbcSinkOptions,
+            Map<String, SeaTunnelRowType> seaTunnelRowTypeMap) {
         this.context = context;
         this.connectionProvider = new SimpleJdbcConnectionProvider(jdbcSinkOptions.getJdbcConnectionOptions());
-        this.outputFormat = new JdbcOutputFormatBuilder(dialect, connectionProvider, jdbcSinkOptions, rowType).build();
+        this.outputFormat = new JdbcOutputFormatBuilder(dialect, connectionProvider, jdbcSinkOptions, seaTunnelRowTypeMap).build();
     }
 
     private void tryOpen() throws IOException {
@@ -88,6 +89,7 @@ public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSin
                 connectionProvider.getConnection().commit();
             }
         } catch (SQLException e) {
+            e.printStackTrace();
             new JdbcConnectorException(JdbcConnectorErrorCode.TRANSACTION_OPERATION_FAILED, "commit failed," + e.getMessage(), e);
         }
         return Optional.empty();

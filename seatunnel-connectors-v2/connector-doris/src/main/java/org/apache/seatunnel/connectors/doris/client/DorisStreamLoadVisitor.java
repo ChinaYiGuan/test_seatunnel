@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -52,11 +51,8 @@ public class DorisStreamLoadVisitor {
     private static final String RESULT_LABEL_ABORTED = "ABORTED";
     private static final String RESULT_LABEL_UNKNOWN = "UNKNOWN";
 
-    private Function<String, String[]> nameFun;
-
-    public DorisStreamLoadVisitor(SinkConfig sinkConfig, Function<String, String[]> nameFun) {
+    public DorisStreamLoadVisitor(SinkConfig sinkConfig) {
         this.sinkConfig = sinkConfig;
-        this.nameFun = nameFun;
     }
 
     public Boolean doStreamLoad(DorisFlushTuple flushData) throws IOException {
@@ -64,7 +60,7 @@ public class DorisStreamLoadVisitor {
         if (null == host) {
             throw new DorisConnectorException(CommonErrorCode.ILLEGAL_ARGUMENT, "None of the host in `load_url` could be connected.");
         }
-        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, sinkConfig.getDatabase(), flushData.getTableName());
+        String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, flushData.getDbName(), flushData.getTableName());
         if (log.isDebugEnabled()) {
             log.debug(String.format("Start to join batch data: rows[%d] bytes[%d] label[%s].", flushData.getRows().size(), flushData.getBytes(), flushData.getLabel()));
         }

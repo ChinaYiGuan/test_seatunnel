@@ -27,7 +27,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.apache.flink.streaming.api.operators.StreamSource;
 import org.apache.flink.types.Row;
-import org.apache.seatunnel.api.common.DynamicRowType;
+import org.apache.seatunnel.api.common.SeaTunnelDynamicRowType;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.source.SourceCommonOptions;
@@ -97,13 +97,13 @@ public class SourceExecuteProcessor extends AbstractPluginExecuteProcessor<SeaTu
         checkNotNull(bounded);
         Config config = function.getSourceCfg();
         TypeInformation<Row> resolvedTypeInfo = function.getProducedType();
-        if (function.getSource() instanceof DynamicRowType) {
-            boolean isMultipleFormat = config != null && config.hasPath(CollectionConstants.IS_MULTIPLE_FORMAT_KEY) && config.getBoolean(CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
-            if (isMultipleFormat)
-                resolvedTypeInfo = (TypeInformation<Row>) TypeConverterUtils.convert(SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE);
-            else
-                log.info("Plug-in {} can be configured with 【{}='true'】 to enable multi-meter output.", function.getSource().getPluginName(), CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
-        }
+        //if (function.getSource() instanceof SeaTunnelDynamicRowType) {
+        //    boolean isMultipleFormat = config != null && config.hasPath(CollectionConstants.IS_MULTIPLE_FORMAT_KEY) && config.getBoolean(CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
+        //    if (isMultipleFormat)
+        //        resolvedTypeInfo = (TypeInformation<Row>) TypeConverterUtils.convert(SeaTunnelRowType.DYNAMIC_TSF_ROW_TYPE);
+        //    else
+        //        log.info("Plug-in {} can be configured with 【{}='true'】 to enable multi-meter output.", function.getSource().getPluginName(), CollectionConstants.IS_MULTIPLE_FORMAT_KEY);
+        //}
 
 
         boolean isParallel = function instanceof ParallelSourceFunction;

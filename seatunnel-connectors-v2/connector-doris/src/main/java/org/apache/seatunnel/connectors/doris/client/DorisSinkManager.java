@@ -37,7 +37,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -56,11 +55,11 @@ public class DorisSinkManager {
 
     private final Integer batchIntervalMs;
 
-    public DorisSinkManager(SinkConfig sinkConfig, Function<String, String[]> nameFun) {
+    public DorisSinkManager(SinkConfig sinkConfig) {
         this.sinkConfig = sinkConfig;
         this.batchList = new ArrayList<>();
         this.batchIntervalMs = sinkConfig.getBatchIntervalMs();
-        dorisStreamLoadVisitor = new DorisStreamLoadVisitor(sinkConfig, nameFun);
+        dorisStreamLoadVisitor = new DorisStreamLoadVisitor(sinkConfig);
     }
 
     private void tryInit() throws IOException {
@@ -106,15 +105,14 @@ public class DorisSinkManager {
         if (batchList.isEmpty()) {
             return;
         }
-        Map<String, List<Record>> groupBatchMap = batchList.stream()
-                .collect(Collectors.groupingBy(x -> StringUtils.isNotBlank(sinkConfig.getTable()) ? sinkConfig.getTable() : sinkConfig.getTablePrefix() + x.getIdentifier()));
+        Map<String, List<Record>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(Record::getFullTableName));
 
         for (Iterator<Map.Entry<String, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<String, List<Record>> entry = it.next();
-            String table = entry.getKey();
+            String fullTableName = entry.getKey();
             List<Record> groupList = entry.getValue();
-            if (StringUtils.isBlank(table) || CollectionUtils.isEmpty(groupList)) continue;
-            String label = createBatchLabel(table);
+            if (StringUtils.isBlank(fullTableName) || CollectionUtils.isEmpty(groupList)) continue;
+            String label = createBatchLabel(fullTableName);
             long groupByteSize = groupList.stream()
                     .map(Record::getDataJson)
                     .filter(StringUtils::isNotBlank)
@@ -123,7 +121,8 @@ public class DorisSinkManager {
                     .longValue();
 
             DorisFlushTuple tuple = new DorisFlushTuple(
-                    table,
+                    StringUtils.substringBefore(fullTableName, "."),
+                    StringUtils.substringAfterLast(fullTableName, "."),
                     label,
                     groupByteSize,
                     groupList
@@ -142,7 +141,7 @@ public class DorisSinkManager {
                     }
 
                     if (e instanceof DorisConnectorException && ((DorisConnectorException) e).needReCreateLabel()) {
-                        String newLabel = createBatchLabel(table);
+                        String newLabel = createBatchLabel(fullTableName);
                         log.warn(String.format("Batch label changed from [%s] to [%s]", tuple.getLabel(), newLabel));
                         tuple.setLabel(newLabel);
                     }
@@ -171,15 +170,13 @@ public class DorisSinkManager {
         }
     }
 
-    public String createBatchLabel(String identifier) {
+    public String createBatchLabel(String fullTableName) {
         String labelPrefix = "";
         if (!Strings.isNullOrEmpty(sinkConfig.getLabelPrefix())) {
             labelPrefix = sinkConfig.getLabelPrefix();
         }
         final int maxLen = 127;
-        final String identifierLab = StringUtils.isNotBlank(sinkConfig.getTablePrefix()) ?
-                String.format("%s-%s%s", sinkConfig.getDatabase(), sinkConfig.getTablePrefix(), StringUtils.substringAfter(identifier, "\\.")) :
-                String.format("%s-%s", sinkConfig.getDatabase(), sinkConfig.getTable());
+        final String identifierLab = String.format("%s-%s", StringUtils.substringBefore(fullTableName, "."), StringUtils.substringAfterLast(fullTableName, "."));
         final String lable = StringUtils.strip(
                 String.format("%s-%s-%s-%s",
                         labelPrefix,

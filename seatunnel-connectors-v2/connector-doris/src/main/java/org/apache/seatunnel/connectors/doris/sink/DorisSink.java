@@ -19,9 +19,7 @@ package org.apache.seatunnel.connectors.doris.sink;
 
 import com.google.auto.service.AutoService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -38,6 +36,7 @@ import org.apache.seatunnel.connectors.doris.util.DorisTypeConvertUtil;
 import org.apache.seatunnel.connectors.doris.util.rest.DorisRestUtil;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSimpleSink;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
+import org.apache.seatunnel.connectors.seatunnel.common.util.ElParseUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.util.LinkedHashMap;
@@ -49,14 +48,14 @@ import static org.apache.seatunnel.connectors.doris.config.SinkConfig.*;
 
 @AutoService(SeaTunnelSink.class)
 @Slf4j
-public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements DynamicRowType<SeaTunnelRow> {
+public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     private Config pluginConfig;
     private SeaTunnelRowType seaTunnelRowType;
     private DorisRestUtil restUtil;
     private String db;
     private String tab;
-    private String tabPrefix;
+    private String tabEl;
 
     private final Map<String, SeaTunnelRowType> tsfTypes = new LinkedHashMap<>();
 
@@ -69,7 +68,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
     public void prepare(Config pluginConfig) throws PrepareFailException {
         this.pluginConfig = pluginConfig;
         CheckResult result = CheckConfigUtil.checkAllExists(pluginConfig, NODE_URLS.key(), DATABASE.key(), USERNAME.key(), PASSWORD.key());
-        CheckResult resultTab = CheckConfigUtil.checkAtLeastOneExists(pluginConfig, TABLE.key(), TABLE_PREFIX.key());
+        CheckResult resultTab = CheckConfigUtil.checkAtLeastOneExists(pluginConfig, TABLE.key(), TABLE_EL.key());
         if (!result.isSuccess() || !resultTab.isSuccess()) {
             throw new DorisConnectorException(SeaTunnelAPIErrorCode.CONFIG_VALIDATION_FAILED,
                     String.format("PluginName: %s, PluginType: %s, Message: %s",
@@ -77,7 +76,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
         }
         this.db = pluginConfig.getString(DATABASE.key());
         this.tab = pluginConfig.hasPath(TABLE.key()) ? pluginConfig.getString(TABLE.key()) : null;
-        this.tabPrefix = pluginConfig.hasPath(TABLE_PREFIX.key()) ? pluginConfig.getString(TABLE_PREFIX.key()) : null;
+        this.tabEl = pluginConfig.hasPath(TABLE_EL.key()) ? pluginConfig.getString(TABLE_EL.key()) : null;
 
         String user = pluginConfig.getString(USERNAME.key());
         String pass = pluginConfig.getString(PASSWORD.key());
@@ -92,6 +91,7 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
 
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
+        tsfTypes.put(tab, seaTunnelRowType);
         this.seaTunnelRowType = seaTunnelRowType;
     }
 
@@ -102,33 +102,26 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> implements
 
     @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context) {
-        if (StringUtils.isNotBlank(tab)) {
-            tsfTypes.put(tab, seaTunnelRowType);
-        }
         return new DorisSinkWriter(pluginConfig, tsfTypes);
     }
 
     @Override
     public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
-        if (tsfTypes.containsKey(identifier)) return tsfTypes.get(identifier);
-        String tableFullName = StringUtils.isNotBlank(tab) ? tab : tabPrefix + identifier;
-        SchemaResp schemaResp = restUtil.querySchema(db, tableFullName);
-        if (schemaResp != null && schemaResp.getProperties() != null) {
-            List<Pair<String, ? extends SeaTunnelDataType<?>>> nameTypePairList = schemaResp.getProperties()
-                    .stream()
-                    .map(x -> {
-                        SeaTunnelDataType<?> seaTunnelDataType = DorisTypeConvertUtil.convertFromColumn(x.getType());
-                        return Pair.of(x.getName(), seaTunnelDataType);
-                    }).collect(Collectors.toList());
-            String[] names = nameTypePairList.stream().map(Pair::getLeft).toArray(String[]::new);
-            SeaTunnelDataType[] seaTunnelDataTypes = nameTypePairList.stream().map(Pair::getRight).toArray(SeaTunnelDataType[]::new);
-            SeaTunnelRowType ty = new SeaTunnelRowType(names, seaTunnelDataTypes);
-            tsfTypes.put(identifier, ty);
-            return ty;
-        } else {
-            log.warn("get doris table schema err. tab:{}", tab);
-        }
-        return null;
+        String tableFullName = ElParseUtil.parseTableFullName(tab, tabEl, identifier);
+        return tsfTypes.computeIfAbsent(tableFullName, x1 -> {
+            SchemaResp schemaResp = restUtil.querySchema(tableFullName);
+            if (schemaResp != null && schemaResp.getProperties() != null) {
+                List<Pair<String, ? extends SeaTunnelDataType<?>>> nameTypePairList = schemaResp.getProperties()
+                        .stream()
+                        .map(x -> Pair.of(x.getName(), DorisTypeConvertUtil.convertFromColumn(x.getType()))).collect(Collectors.toList());
+                String[] names = nameTypePairList.stream().map(Pair::getLeft).toArray(String[]::new);
+                SeaTunnelDataType<?>[] seaTunnelDataTypes = nameTypePairList.stream().map(Pair::getRight).toArray(SeaTunnelDataType[]::new);
+                return new SeaTunnelRowType(names, seaTunnelDataTypes);
+            } else {
+                log.warn("get doris table schema err. tab:{}", tab);
+            }
+            return null;
+        });
     }
 
 }

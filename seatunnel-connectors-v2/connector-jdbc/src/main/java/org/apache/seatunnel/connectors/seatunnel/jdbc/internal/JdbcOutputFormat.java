@@ -45,7 +45,7 @@ import java.util.function.Supplier;
  * A JDBC outputFormat
  */
 public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
-    implements Serializable {
+        implements Serializable {
 
     protected final JdbcConnectionProvider connectionProvider;
 
@@ -65,9 +65,9 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
     private transient volatile Exception flushException;
 
     public JdbcOutputFormat(
-        JdbcConnectionProvider connectionProvider,
-        JdbcConnectionOptions jdbcConnectionOptions,
-        StatementExecutorFactory<E> statementExecutorFactory) {
+            JdbcConnectionProvider connectionProvider,
+            JdbcConnectionOptions jdbcConnectionOptions,
+            StatementExecutorFactory<E> statementExecutorFactory) {
         this.connectionProvider = checkNotNull(connectionProvider);
         this.jdbcConnectionOptions = checkNotNull(jdbcConnectionOptions);
         this.statementExecutorFactory = checkNotNull(statementExecutorFactory);
@@ -78,7 +78,7 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
      */
 
     public void open()
-        throws IOException {
+            throws IOException {
         try {
             connectionProvider.getOrEstablishConnection();
         } catch (Exception e) {
@@ -88,35 +88,36 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
 
         if (jdbcConnectionOptions.getBatchIntervalMs() != 0 && jdbcConnectionOptions.getBatchSize() != 1) {
             this.scheduler =
-                Executors.newScheduledThreadPool(
-                    1, runnable -> {
-                        AtomicInteger cnt = new AtomicInteger(0);
-                        Thread thread = new Thread(runnable);
-                        thread.setDaemon(true);
-                        thread.setName("jdbc-upsert-output-format" + "-" + cnt.incrementAndGet());
-                        return thread;
-                    });
+                    Executors.newScheduledThreadPool(
+                            1, runnable -> {
+                                AtomicInteger cnt = new AtomicInteger(0);
+                                Thread thread = new Thread(runnable);
+                                thread.setDaemon(true);
+                                thread.setName("jdbc-upsert-output-format" + "-" + cnt.incrementAndGet());
+                                return thread;
+                            });
             this.scheduledFuture =
-                this.scheduler.scheduleWithFixedDelay(
-                    () -> {
-                        synchronized (JdbcOutputFormat.this) {
-                            if (!closed) {
-                                try {
-                                    flush();
-                                } catch (Exception e) {
-                                    flushException = e;
+                    this.scheduler.scheduleWithFixedDelay(
+                            () -> {
+                                synchronized (JdbcOutputFormat.this) {
+                                    if (!closed) {
+                                        try {
+                                            flush();
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            flushException = e;
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    },
-                    jdbcConnectionOptions.getBatchIntervalMs(),
-                    jdbcConnectionOptions.getBatchIntervalMs(),
-                    TimeUnit.MILLISECONDS);
+                            },
+                            jdbcConnectionOptions.getBatchIntervalMs(),
+                            jdbcConnectionOptions.getBatchIntervalMs(),
+                            TimeUnit.MILLISECONDS);
         }
     }
 
     private E createAndOpenStatementExecutor(
-        StatementExecutorFactory<E> statementExecutorFactory) {
+            StatementExecutorFactory<E> statementExecutorFactory) {
         E exec = statementExecutorFactory.get();
         try {
             exec.prepareStatements(connectionProvider.getConnection());
@@ -138,21 +139,22 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
             addToBatch(record);
             batchCount++;
             if (jdbcConnectionOptions.getBatchSize() > 0
-                && batchCount >= jdbcConnectionOptions.getBatchSize()) {
+                    && batchCount >= jdbcConnectionOptions.getBatchSize()) {
                 flush();
             }
         } catch (Exception e) {
+            e.printStackTrace();
             throw new JdbcConnectorException(CommonErrorCode.SQL_OPERATION_FAILED, "Writing records to JDBC failed.", e);
         }
     }
 
     protected void addToBatch(I record)
-        throws SQLException {
+            throws SQLException {
         jdbcStatementExecutor.addToBatch(record);
     }
 
     public synchronized void flush()
-        throws IOException {
+            throws IOException {
         checkFlushException();
         final int sleepMs = 1000;
         for (int i = 0; i <= jdbcConnectionOptions.getMaxRetries(); i++) {
@@ -171,8 +173,8 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
                     }
                 } catch (Exception exception) {
                     LOG.error(
-                        "JDBC connection is not valid, and reestablish connection failed.",
-                        exception);
+                            "JDBC connection is not valid, and reestablish connection failed.",
+                            exception);
                     throw new JdbcConnectorException(JdbcConnectorErrorCode.CONNECT_DATABASE_FAILED, "Reestablish JDBC connection failed", exception);
                 }
                 try {
@@ -180,14 +182,14 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                     throw new JdbcConnectorException(CommonErrorCode.FLUSH_DATA_FAILED,
-                        "unable to flush; interrupted while doing another attempt", e);
+                            "unable to flush; interrupted while doing another attempt", e);
                 }
             }
         }
     }
 
     protected void attemptFlush()
-        throws SQLException {
+            throws SQLException {
         jdbcStatementExecutor.executeBatch();
     }
 
@@ -225,10 +227,10 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
     }
 
     public void updateExecutor(boolean reconnect)
-        throws SQLException, ClassNotFoundException {
+            throws SQLException, ClassNotFoundException {
         jdbcStatementExecutor.closeStatements();
         jdbcStatementExecutor.prepareStatements(
-            reconnect ? connectionProvider.reestablishConnection() : connectionProvider.getConnection());
+                reconnect ? connectionProvider.reestablishConnection() : connectionProvider.getConnection());
     }
 
     @VisibleForTesting
@@ -242,7 +244,7 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>>
      * @param <T> The type of instance.
      */
     public interface StatementExecutorFactory<T extends JdbcBatchStatementExecutor<?>>
-        extends Supplier<T>, Serializable {
+            extends Supplier<T>, Serializable {
     }
 
     ;

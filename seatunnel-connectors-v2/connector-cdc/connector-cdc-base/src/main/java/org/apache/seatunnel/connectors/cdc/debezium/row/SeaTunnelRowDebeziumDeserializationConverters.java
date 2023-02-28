@@ -17,18 +17,6 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
-import io.debezium.connector.AbstractSourceInfo;
-import io.debezium.data.Envelope;
-import io.debezium.data.SpecialValueDecimal;
-import io.debezium.data.VariableScaleDecimal;
-import io.debezium.time.*;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.connect.data.Decimal;
-import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.source.SourceRecord;
-import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
@@ -37,10 +25,27 @@ import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConve
 import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
 import org.apache.seatunnel.connectors.cdc.debezium.utils.TemporalConversions;
 
+import io.debezium.data.SpecialValueDecimal;
+import io.debezium.data.VariableScaleDecimal;
+import io.debezium.time.MicroTime;
+import io.debezium.time.MicroTimestamp;
+import io.debezium.time.NanoTime;
+import io.debezium.time.NanoTimestamp;
+import io.debezium.time.Timestamp;
+import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.source.SourceRecord;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -67,49 +72,18 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
         this.fieldNames = physicalDataType.getFieldNames();
     }
 
-
-    private SeaTunnelDataType<?> typeMapping(String typeName) {
-        SeaTunnelDataType<?> sdt = BasicType.STRING_TYPE;
-        if (StringUtils.isNotBlank(typeName))
-            switch (typeName.trim().toUpperCase()) {
-                case "BOOLEAN":
-                    sdt = BasicType.BOOLEAN_TYPE;
-                    break;
-                case "BYTE":
-                    sdt = BasicType.BYTE_TYPE;
-                    break;
-                case "SHORT":
-                    sdt = BasicType.SHORT_TYPE;
-                    break;
-                case "INTEGER":
-                case "INT":
-                    sdt = BasicType.INT_TYPE;
-                    break;
-                case "LONG":
-                    sdt = BasicType.LONG_TYPE;
-                    break;
-                case "FLOAT":
-                    sdt = BasicType.FLOAT_TYPE;
-                    break;
-                case "DOUBLE":
-                    sdt = BasicType.DOUBLE_TYPE;
-                    break;
-                case "VOID":
-                    sdt = BasicType.VOID_TYPE;
-                    break;
-                default:
-                    break;
-            }
-        return sdt;
-    }
-
     public SeaTunnelRow convert(SourceRecord record, Struct struct, Schema schema) throws Exception {
         int arity = physicalConverters.length + metadataConverters.length;
         SeaTunnelRow row = new SeaTunnelRow(arity);
         // physical column
         for (int i = 0; i < physicalConverters.length; i++) {
             String fieldName = fieldNames[i];
-            Object fieldValue = struct.get(fieldName);
+            Object fieldValue = null;
+            try {
+                fieldValue = struct.get(fieldName);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
             Field field = schema.field(fieldName);
             if (field == null) {
                 row.setField(i, null);
@@ -123,12 +97,6 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
         for (int i = 0; i < metadataConverters.length; i++) {
             row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
         }
-        Struct messageStruct = (Struct) record.value();
-        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
-        String tableName = sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY);
-        //String[] split = record.topic().split("\\.");
-        //row.setIdentifier(split.length == 3 ? split[2] : record.topic());
-        row.setIdentifier(tableName);
         return row;
     }
 

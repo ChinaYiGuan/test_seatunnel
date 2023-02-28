@@ -12,11 +12,14 @@ public class DolphinDataSourceTest {
 
     public static void main(String[] args) {
         //dev
-        System.setProperty("dataSourceHost", "http://localhost:12345");
-        System.setProperty("dataSourceToken", "701761fd7842afa31d14f9ecec5fd5d0");
-        //uat
-//        System.setProperty("dataSourceHost", "http://10.192.147.2:12345");
-//        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
+//        System.setProperty("dataSourceHost", "http://localhost:12345");
+//        System.setProperty("dataSourceToken", "701761fd7842afa31d14f9ecec5fd5d0");
+        //uat2
+        System.setProperty("dataSourceHost", "http://10.192.147.2:12345");
+        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
+        //uat1
+//        System.setProperty("dataSourceHost", "http://10.192.147.1:12345");
+//        System.setProperty("dataSourceToken", "bf77ef162b00c9d03bc8849ee1d60407");
 
         System.setProperty("is_show_parseDs", "true");
         System.setProperty("is_show_parseDs", "all");

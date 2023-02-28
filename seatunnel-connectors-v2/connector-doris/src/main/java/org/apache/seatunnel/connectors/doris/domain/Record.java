@@ -12,5 +12,6 @@ import java.io.Serializable;
 public class Record implements Serializable {
 
     private String identifier;
+    private String fullTableName;
     private String dataJson;
 }

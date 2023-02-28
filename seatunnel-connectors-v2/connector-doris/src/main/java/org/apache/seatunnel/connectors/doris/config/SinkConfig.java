@@ -17,13 +17,11 @@
 
 package org.apache.seatunnel.connectors.doris.config;
 
+import lombok.Data;
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
 import org.apache.seatunnel.common.config.TypesafeConfigUtils;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
-
-import lombok.Data;
 
 import java.util.HashMap;
 import java.util.List;
@@ -70,10 +68,10 @@ public class SinkConfig {
             .noDefaultValue()
             .withDescription("The name of Doris table");
 
-    public static final Option<String> TABLE_PREFIX = Options.key("table.prefix")
+    public static final Option<String> TABLE_EL = Options.key("table.el")
             .stringType()
             .defaultValue("")
-            .withDescription("The name of Doris table prefix");
+            .withDescription("The name of Doris table el");
 
     public static final Option<String> DORIS_SINK_CONFIG_PREFIX = Options.key("sink.properties.")
             .stringType()
@@ -127,7 +125,7 @@ public class SinkConfig {
     private String password;
     private String database;
     private String table;
-    private String tablePrefix;
+    private String tableEl;
     private String labelPrefix;
     private String columnSeparator;
     private StreamLoadFormat loadFormat = DEFAULT_LOAD_FORMAT;
@@ -147,8 +145,8 @@ public class SinkConfig {
         sinkConfig.setDatabase(pluginConfig.getString(DATABASE.key()));
         if (pluginConfig.hasPath(TABLE.key())) {
             sinkConfig.setTable(pluginConfig.getString(TABLE.key()));
-        } else if (pluginConfig.hasPath(TABLE_PREFIX.key())) {
-            sinkConfig.setTablePrefix(pluginConfig.getString(TABLE_PREFIX.key()));
+        } else if (pluginConfig.hasPath(TABLE_EL.key())) {
+            sinkConfig.setTableEl(pluginConfig.getString(TABLE_EL.key()));
         }
 
         if (pluginConfig.hasPath(USERNAME.key())) {

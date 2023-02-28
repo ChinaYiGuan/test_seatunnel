@@ -43,7 +43,7 @@ import java.util.Optional;
  *                                {@link SinkAggregatedCommitter} handle it, this class should implement interface {@link Serializable}.
  */
 public interface SeaTunnelSink<IN, StateT, CommitInfoT, AggregatedCommitInfoT>
-    extends Serializable, PluginIdentifierInterface, SeaTunnelPluginLifeCycle, SeaTunnelJobAware {
+        extends Serializable, PluginIdentifierInterface, SeaTunnelPluginLifeCycle, SeaTunnelJobAware, SinkDynamicRowType<IN> {
 
     /**
      * Set the row type info of sink row data. This method will be automatically called by translation.

@@ -56,10 +56,10 @@ public class DorisRestUtil implements Serializable {
         return "Basic " + new String(encoded);
     }
 
-    public SchemaResp querySchema(String db, String tab) {
+    public SchemaResp querySchema(String tableFullName) {
         return TryUtil.invoke((x) -> {
             HttpHelper httpHelper = new HttpHelper();
-            String url = urlPrefix + String.format("/api/%s/%s/_schema", db, tab);
+            String url = urlPrefix + String.format("/api/%s/%s/_schema", StringUtils.substringBefore(tableFullName, "."), StringUtils.substringAfterLast(tableFullName, "."));
             Map<String, String> headers = new HashMap<>();
             if (StringUtils.isNotBlank(pass) && StringUtils.isNotBlank(user))
                 headers.put(HttpHeaders.AUTHORIZATION, basicAuthHeader(user, pass));

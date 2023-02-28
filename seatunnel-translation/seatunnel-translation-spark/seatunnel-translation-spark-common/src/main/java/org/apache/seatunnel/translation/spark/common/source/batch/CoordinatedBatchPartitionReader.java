@@ -40,7 +40,7 @@ public class CoordinatedBatchPartitionReader extends ParallelBatchPartitionReade
         super(source, parallelism, subtaskId);
         this.collectorMap = new HashMap<>(parallelism);
         for (int i = 0; i < parallelism; i++) {
-            collectorMap.put(i, new InternalRowCollector(handover, new Object(), source.getProducedType()));
+            collectorMap.put(i, new InternalRowCollector(handover, new Object(), source.getDynamicProducedType(source)));
         }
     }
 

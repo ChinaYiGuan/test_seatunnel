@@ -48,7 +48,9 @@ public class JdbcSourceOptions implements Serializable {
 
     public JdbcSourceOptions(Config config) {
         this.jdbcConnectionOptions = buildJdbcConnectionOptions(config);
-        this.query = config.getString(JdbcConfig.QUERY.key());
+        if (config.hasPath(JdbcConfig.QUERY.key())) {
+            this.query = config.getString(JdbcConfig.QUERY.key());
+        }
         if (config.hasPath(JdbcConfig.PARTITION_COLUMN.key())) {
             this.partitionColumn = config.getString(JdbcConfig.PARTITION_COLUMN.key());
         }

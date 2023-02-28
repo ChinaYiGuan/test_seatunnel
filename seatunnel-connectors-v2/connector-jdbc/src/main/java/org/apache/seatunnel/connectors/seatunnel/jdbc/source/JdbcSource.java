@@ -20,7 +20,6 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.source;
 import com.google.auto.service.AutoService;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.serialization.Serializer;
 import org.apache.seatunnel.api.source.Boundedness;
@@ -55,7 +54,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @AutoService(SeaTunnelSource.class)
-public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit, JdbcSourceState>, DynamicRowType<SeaTunnelRowType> {
+public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit, JdbcSourceState> {
     protected static final Logger LOG = LoggerFactory.getLogger(JdbcSource.class);
 
     private JdbcSourceOptions jdbcSourceOptions;
@@ -227,7 +226,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
 
     private List<String> dbTabsPattern(Connection conn) {
         try {
-            List<String> filterDbs = jdbcDialect.listDatabase(conn, jdbcSourceOptions)
+            List<String> filterDbs = jdbcDialect.listDatabase(conn)
                     .stream()
                     .filter(findDbName -> jdbcSourceOptions.getTables()
                             .stream()
@@ -240,7 +239,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                     .flatMap(filterDbName ->
                             {
                                 try {
-                                    return jdbcDialect.listTables(conn, jdbcSourceOptions, filterDbName)
+                                    return jdbcDialect.listTables(conn, filterDbName)
                                             .stream()
                                             .map(findTabName -> filterDbName + "." + findTabName)
                                             .filter(findFullTabName -> jdbcSourceOptions.getTables().stream()
@@ -263,11 +262,11 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
         JdbcDialectTypeMapper jdbcDialectTypeMapper = jdbcDialect.getJdbcDialectTypeMapper();
         List<JdbcSourceCfgMeta> tableCfgMetas;
         if (StringUtils.isNotBlank(jdbcSourceOptions.getQuery())) {
-            tableCfgMetas = Arrays.asList(new JdbcSourceCfgMeta(null, jdbcSourceOptions.getQuery()));
+            tableCfgMetas = Arrays.asList(new JdbcSourceCfgMeta(null, null, jdbcSourceOptions.getQuery()));
         } else {
             List<String> filterFullTabs = dbTabsPattern(conn);
             tableCfgMetas = filterFullTabs.stream()
-                    .map(x -> new JdbcSourceCfgMeta(x, String.format("SELECT * FROM %s", x)))
+                    .map(x -> new JdbcSourceCfgMeta(StringUtils.substringBefore(x, "."), StringUtils.substringAfterLast(x, "."), String.format("SELECT * FROM %s", x)))
                     .collect(Collectors.toList());
         }
 
@@ -279,7 +278,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
             try {
                 String tmpOldQuery = jdbcSourceOptions.getQuery();
                 jdbcSourceOptions.setQuery(query);
-                ResultSetMetaData resultSetMetaData = jdbcDialect.getResultSetMetaData(conn, jdbcSourceOptions);
+                ResultSetMetaData resultSetMetaData = jdbcDialect.getResultSetMetaData(conn, jdbcSourceOptions.getQuery(), false);
                 for (int i = 1; i <= resultSetMetaData.getColumnCount(); i++) {
                     fieldNames.add(resultSetMetaData.getColumnName(i));
                     seaTunnelDataTypes.add(jdbcDialectTypeMapper.mapping(resultSetMetaData, i));
@@ -363,9 +362,13 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
         return type.equals(BasicType.INT_TYPE) || type.equals(BasicType.LONG_TYPE) || type.equals(BasicType.FLOAT_TYPE) || type.equals(BasicType.DOUBLE_TYPE);
     }
 
-    @Override
-    public SeaTunnelDataType<SeaTunnelRowType> getDynamicRowType(String identifier) {
-        SeaTunnelDataType value = typeInfoMap.entrySet().stream().filter(x -> x.equals(identifier)).findFirst().get().getValue();
+    public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
+        SeaTunnelDataType<SeaTunnelRow> value = typeInfoMap.entrySet().stream().filter(x -> x.getKey().getTable().equals(identifier)).findFirst().get().getValue();
         return value;
+    }
+
+    @Override
+    public boolean isMultiple() {
+        return typeInfoMap.size() > 1;
     }
 }

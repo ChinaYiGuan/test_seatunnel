@@ -17,8 +17,11 @@
 
 package org.apache.seatunnel.connectors.cdc.base.source.reader;
 
+import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.data.Envelope;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.Offset;
@@ -28,10 +31,7 @@ import org.apache.seatunnel.connectors.cdc.base.source.split.state.SourceSplitSt
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.seatunnel.connectors.seatunnel.common.source.reader.RecordEmitter;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isLowWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isWatermarkEvent;
@@ -112,13 +112,14 @@ public class IncrementalSourceRecordEmitter<T>
 
     protected void emitElement(SourceRecord element, Collector<T> output) throws Exception {
         outputCollector.output = output;
+
         if (Objects.nonNull(element) &&
                 StringUtils.isNotBlank(element.topic()) &&
                 element.topic().split("\\.").length >= 3 &&
-                deserializationSchemaMap.containsKey(element.topic().split("\\.")[2])
+                deserializationSchemaMap.containsKey(StringUtils.substringAfter(element.topic(),"."))
         ) {
-            String tab = element.topic().split("\\.")[2];
-            DebeziumDeserializationSchema<T> debeziumDeserializationSchema = deserializationSchemaMap.get(tab);
+            String dbTab = StringUtils.substringAfter(element.topic(),".");
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema = deserializationSchemaMap.get(dbTab);
             if (Objects.nonNull(debeziumDeserializationSchema)) {
                 debeziumDeserializationSchema.deserialize(element, outputCollector);
             }

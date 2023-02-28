@@ -21,6 +21,7 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.internal;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
@@ -131,10 +132,10 @@ public class JdbcInputFormat implements Serializable {
             }
             Object[] parameterValues = inputSplit.getParameterValues();
             String originQuery = inputSplit.getJdbcSourceCfgMeta().getQuery();
-            if (statement == null) {
+            if (statement == null || statement.isClosed()) {
                 jdbcSourceCfgMeta = inputSplit.getJdbcSourceCfgMeta();
             }
-            if (statement == null) {
+            if (statement == null || statement.isClosed()) {
                 String queryTemplate = StringUtils.stripEnd(StringUtils.stripEnd(originQuery, " "), ";");
                 if (StringUtils.isNotBlank(inputSplit.getPartitionColumnName())) {
                     String partitionColumnName = inputSplit.getPartitionColumnName();
@@ -204,6 +205,8 @@ public class JdbcInputFormat implements Serializable {
             return;
         }
         try {
+            if (statement != null)
+                statement.close();
             resultSet.close();
         } catch (SQLException se) {
             LOG.info("Inputformat ResultSet couldn't be closed - " + se.getMessage());
@@ -231,8 +234,10 @@ public class JdbcInputFormat implements Serializable {
             SeaTunnelRow seaTunnelRow = null;
             if (typeInfo != null) {
                 seaTunnelRow = jdbcRowConverter.toInternal(resultSet, typeInfo);
-                String fullTableName = jdbcSourceCfgMeta.getTable();
-                seaTunnelRow.setIdentifier(StringUtils.isNotBlank(fullTableName) ? StringUtils.substringAfter(fullTableName, ".") : fullTableName);
+                String tab = jdbcSourceCfgMeta.getTable();
+                if (StringUtils.isNotBlank(tab)) {
+                    seaTunnelRow.setRowIdentifier(RowIdentifier.newBuilder().build(jdbcSourceCfgMeta.getDb(),tab));
+                }
                 // update hasNext after we've read the record
                 hasNext = resultSet.next();
             } else {

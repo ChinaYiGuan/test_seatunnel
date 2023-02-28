@@ -34,6 +34,7 @@ import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.translation.flink.statistics.SourceStatistics;
@@ -135,7 +136,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @SuppressWarnings("unchecked")
     @Override
     public TypeInformation<Row> getProducedType() {
-        return (TypeInformation<Row>) TypeConverterUtils.convert(source.getProducedType());
+        return (TypeInformation<Row>) TypeConverterUtils.convert(source.getDynamicProducedType(source));
     }
 
     @Override

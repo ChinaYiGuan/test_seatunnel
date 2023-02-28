@@ -91,7 +91,7 @@ public class MicroBatchSourceReader implements MicroBatchReader {
 
     @Override
     public StructType readSchema() {
-        return (StructType) TypeConverterUtils.convert(source.getProducedType());
+        return (StructType) TypeConverterUtils.convert(source.getDynamicProducedType(source));
     }
 
     @Override

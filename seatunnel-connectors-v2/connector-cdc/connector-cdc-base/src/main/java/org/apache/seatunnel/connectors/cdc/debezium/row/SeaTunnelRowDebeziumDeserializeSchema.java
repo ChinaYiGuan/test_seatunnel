@@ -17,31 +17,31 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import org.apache.seatunnel.api.source.Collector;
-import org.apache.seatunnel.api.table.type.RowKind;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
-import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
-
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.seatunnel.api.source.Collector;
+import org.apache.seatunnel.api.table.type.RowKind;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
+import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
+import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
 
 import java.io.Serializable;
 import java.time.ZoneId;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Deserialization schema from Debezium object to {@link SeaTunnelRow}.
  */
 public final class SeaTunnelRowDebeziumDeserializeSchema
-    implements DebeziumDeserializationSchema<SeaTunnelRow> {
+        implements DebeziumDeserializationSchema<SeaTunnelRow> {
     private static final long serialVersionUID = 1L;
 
     /**
@@ -67,17 +67,17 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
     }
 
     SeaTunnelRowDebeziumDeserializeSchema(
-        SeaTunnelRowType physicalDataType,
-        MetadataConverter[] metadataConverters,
-        SeaTunnelRowType resultType,
-        ValueValidator validator,
-        ZoneId serverTimeZone,
-        DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
+            SeaTunnelRowType physicalDataType,
+            MetadataConverter[] metadataConverters,
+            SeaTunnelRowType resultType,
+            ValueValidator validator,
+            ZoneId serverTimeZone,
+            DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
         this.converters = new SeaTunnelRowDebeziumDeserializationConverters(
-            physicalDataType,
-            metadataConverters,
-            serverTimeZone,
-            userDefinedConverterFactory
+                physicalDataType,
+                metadataConverters,
+                serverTimeZone,
+                userDefinedConverterFactory
         );
         this.resultTypeInfo = checkNotNull(resultType);
         this.validator = checkNotNull(validator);
@@ -90,37 +90,50 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
         Schema valueSchema = record.valueSchema();
 
         Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+        String op = messageStruct.getString(Envelope.FieldName.OPERATION);
+        Long ts = messageStruct.getInt64(Envelope.FieldName.TIMESTAMP);
         // TODO: multi-table
         String tableName = sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+        String db = sourceStruct.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+        String sourceName = sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY);
+        RowIdentifier rowIdentifier = RowIdentifier.newBuilder()
+                .pluginName(sourceName)
+                .dataTs(ts)
+                .addMeta("op", op)
+                .build(db, tableName);
 
         if (operation == Envelope.Operation.CREATE || operation == Envelope.Operation.READ) {
             SeaTunnelRow insert = extractAfterRow(converters, record, messageStruct, valueSchema);
             insert.setRowKind(RowKind.INSERT);
             validator.validate(insert, RowKind.INSERT);
+            insert.setRowIdentifier(rowIdentifier);
             collector.collect(insert);
         } else if (operation == Envelope.Operation.DELETE) {
             SeaTunnelRow delete = extractBeforeRow(converters, record, messageStruct, valueSchema);
             validator.validate(delete, RowKind.DELETE);
             delete.setRowKind(RowKind.DELETE);
+            delete.setRowIdentifier(rowIdentifier);
             collector.collect(delete);
         } else {
             SeaTunnelRow before = extractBeforeRow(converters, record, messageStruct, valueSchema);
             validator.validate(before, RowKind.UPDATE_BEFORE);
             before.setRowKind(RowKind.UPDATE_BEFORE);
+            before.setRowIdentifier(rowIdentifier);
             collector.collect(before);
 
             SeaTunnelRow after = extractAfterRow(converters, record, messageStruct, valueSchema);
             validator.validate(after, RowKind.UPDATE_AFTER);
             after.setRowKind(RowKind.UPDATE_AFTER);
+            after.setRowIdentifier(rowIdentifier);
             collector.collect(after);
         }
     }
 
     private SeaTunnelRow extractAfterRow(
-        SeaTunnelRowDebeziumDeserializationConverters runtimeConverter,
-        SourceRecord record,
-        Struct value,
-        Schema valueSchema) throws Exception {
+            SeaTunnelRowDebeziumDeserializationConverters runtimeConverter,
+            SourceRecord record,
+            Struct value,
+            Schema valueSchema) throws Exception {
 
         Schema afterSchema = valueSchema.field(Envelope.FieldName.AFTER).schema();
         Struct after = value.getStruct(Envelope.FieldName.AFTER);
@@ -128,11 +141,11 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
     }
 
     private SeaTunnelRow extractBeforeRow(
-        SeaTunnelRowDebeziumDeserializationConverters runtimeConverter,
-        SourceRecord record,
-        Struct value,
-        Schema valueSchema)
-        throws Exception {
+            SeaTunnelRowDebeziumDeserializationConverters runtimeConverter,
+            SourceRecord record,
+            Struct value,
+            Schema valueSchema)
+            throws Exception {
 
         Schema beforeSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
         Struct before = value.getStruct(Envelope.FieldName.BEFORE);
@@ -166,7 +179,7 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
         };
         private ZoneId serverTimeZone = ZoneId.of("UTC");
         private DebeziumDeserializationConverterFactory userDefinedConverterFactory =
-            DebeziumDeserializationConverterFactory.DEFAULT;
+                DebeziumDeserializationConverterFactory.DEFAULT;
 
         public Builder setPhysicalRowType(SeaTunnelRowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -194,19 +207,19 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
         }
 
         public Builder setUserDefinedConverterFactory(
-            DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
+                DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
             this.userDefinedConverterFactory = userDefinedConverterFactory;
             return this;
         }
 
         public SeaTunnelRowDebeziumDeserializeSchema build() {
             return new SeaTunnelRowDebeziumDeserializeSchema(
-                physicalRowType,
-                metadataConverters,
-                resultTypeInfo,
-                validator,
-                serverTimeZone,
-                userDefinedConverterFactory);
+                    physicalRowType,
+                    metadataConverters,
+                    resultTypeInfo,
+                    validator,
+                    serverTimeZone,
+                    userDefinedConverterFactory);
         }
     }
 }

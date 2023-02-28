@@ -19,6 +19,7 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.executor;
 
 import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
 
@@ -30,19 +31,21 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 @RequiredArgsConstructor
 public class BufferReducedBatchStatementExecutor implements JdbcBatchStatementExecutor<SeaTunnelRow> {
-    @NonNull
+    @NonNull // InsertOrUpdateBatchStatementExecutor
     private final JdbcBatchStatementExecutor<SeaTunnelRow> upsertExecutor;
-    @NonNull
+    @NonNull //SimpleBatchStatementExecutor
     private final JdbcBatchStatementExecutor<SeaTunnelRow> deleteExecutor;
     @NonNull
-    private final Function<SeaTunnelRow, SeaTunnelRow> keyExtractor;
+    private final BiFunction<String,SeaTunnelRow, SeaTunnelRow> keyExtractor;
     @NonNull
-    private final Function<SeaTunnelRow, SeaTunnelRow> valueTransform;
+    private final BiFunction<String,SeaTunnelRow, SeaTunnelRow> valueTransform;
     @NonNull
     private final LinkedHashMap<SeaTunnelRow, Pair<Boolean, SeaTunnelRow>> buffer = new LinkedHashMap<>();
 
@@ -54,14 +57,15 @@ public class BufferReducedBatchStatementExecutor implements JdbcBatchStatementEx
 
     @Override
     public void addToBatch(SeaTunnelRow record) throws SQLException {
+        final String identifier = Optional.ofNullable(record.getRowIdentifier()).map(RowIdentifier::getIdentifier).orElse(null);
         if (RowKind.UPDATE_BEFORE.equals(record.getRowKind())) {
             // do nothing
             return;
         }
 
-        SeaTunnelRow key = keyExtractor.apply(record);
+        SeaTunnelRow key = keyExtractor.apply(identifier,record);
         boolean changeFlag = changeFlag(record.getRowKind());
-        SeaTunnelRow value = valueTransform.apply(record);
+        SeaTunnelRow value = valueTransform.apply(identifier,record);
         buffer.put(key, Pair.of(changeFlag, value));
     }
 

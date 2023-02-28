@@ -34,7 +34,7 @@ import java.io.Serializable;
  * @param <StateT> The type of checkpoint states.
  */
 public interface SeaTunnelSource<T, SplitT extends SourceSplit, StateT extends Serializable>
-    extends Serializable, PluginIdentifierInterface, SeaTunnelPluginLifeCycle, SeaTunnelJobAware {
+        extends Serializable, PluginIdentifierInterface, SeaTunnelPluginLifeCycle, SeaTunnelJobAware, SourceDynamicRowType<T> {
 
     /**
      * Get the boundedness of this source.
@@ -76,7 +76,7 @@ public interface SeaTunnelSource<T, SplitT extends SourceSplit, StateT extends S
      * @throws Exception when create enumerator failed.
      */
     SourceSplitEnumerator<SplitT, StateT> createEnumerator(SourceSplitEnumerator.Context<SplitT> enumeratorContext)
-        throws Exception;
+            throws Exception;
 
     /**
      * Create source split enumerator, used to generate splits. This method will be called when restore from checkpoint.
@@ -94,7 +94,7 @@ public interface SeaTunnelSource<T, SplitT extends SourceSplit, StateT extends S
      *
      * @return enumerator state serializer.
      */
-    default Serializer<StateT> getEnumeratorStateSerializer(){
+    default Serializer<StateT> getEnumeratorStateSerializer() {
         return new DefaultSerializer<>();
     }
 

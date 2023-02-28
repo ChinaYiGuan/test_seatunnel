@@ -18,8 +18,13 @@
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.connection;
 
 import lombok.NonNull;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectLoader;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectTypeMapper;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.options.JdbcConnectionOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,6 +122,24 @@ public class SimpleJdbcConnectionProvider
             throw new RuntimeException(e);
         }
         return targets;
+    }
+
+    public SeaTunnelRowType getTabMeta(String tableFullName) {
+        JdbcDialect jdbcDialect = JdbcDialectLoader.load(jdbcOptions.getUrl());
+        JdbcDialectTypeMapper jdbcDialectTypeMapper = jdbcDialect.getJdbcDialectTypeMapper();
+        try {
+            Connection conn = getOrEstablishConnection();
+            ResultSetMetaData resultSetMetaData = jdbcDialect.getResultSetMetaData(conn, tableFullName, true);
+            ArrayList<String> fieldNames = new ArrayList<>();
+            ArrayList<SeaTunnelDataType<?>> seaTunnelDataTypes = new ArrayList<>();
+            for (int i = 1; i <= resultSetMetaData.getColumnCount(); i++) {
+                fieldNames.add(resultSetMetaData.getColumnName(i));
+                seaTunnelDataTypes.add(jdbcDialectTypeMapper.mapping(resultSetMetaData, i));
+            }
+            return new SeaTunnelRowType(fieldNames.toArray(new String[0]), seaTunnelDataTypes.toArray(new SeaTunnelDataType<?>[0]));
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 

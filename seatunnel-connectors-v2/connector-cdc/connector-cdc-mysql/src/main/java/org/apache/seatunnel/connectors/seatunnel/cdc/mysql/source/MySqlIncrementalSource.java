@@ -20,7 +20,6 @@ package org.apache.seatunnel.connectors.seatunnel.cdc.mysql.source;
 import com.google.auto.service.AutoService;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.seatunnel.api.common.DynamicRowType;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
@@ -49,7 +48,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @AutoService(SeaTunnelSource.class)
-public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig> implements DynamicRowType<T> {
+public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig> {
 
     public String getPluginName() {
         return "MySQL-CDC";
@@ -87,7 +86,7 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
                     final CatalogTable table = mySqlCatalog.getTable(TablePath.of(dbTab));
                     final SeaTunnelRowType physicalRowType = table.getTableSchema().toPhysicalRowDataType();
                     final String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
-                    return Pair.of(dbTab.split("\\.")[1],
+                    return Pair.of(dbTab,
                             (DebeziumDeserializationSchema<T>) SeaTunnelRowDebeziumDeserializeSchema.builder()
                                     .setPhysicalRowType(physicalRowType)
                                     .setResultTypeInfo(physicalRowType)
@@ -115,5 +114,10 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
             return deserializationSchemaMap.get(identifier).getProducedType();
         }
         return null;
+    }
+
+    @Override
+    public boolean isMultiple() {
+        return deserializationSchemaMap.size() > 1;
     }
 }

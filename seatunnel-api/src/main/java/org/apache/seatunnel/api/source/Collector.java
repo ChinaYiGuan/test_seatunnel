@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.api.source;
 
+import org.apache.seatunnel.common.dynamic.RowIdentifier;
+
 /**
  * A {@link Collector} is used to collect data from {@link SourceReader}.
  *
