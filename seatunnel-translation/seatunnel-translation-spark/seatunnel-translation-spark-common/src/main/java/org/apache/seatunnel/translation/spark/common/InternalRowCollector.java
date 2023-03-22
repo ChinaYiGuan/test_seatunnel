@@ -18,6 +18,7 @@
 package org.apache.seatunnel.translation.spark.common;
 
 import org.apache.seatunnel.api.source.Collector;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.common.Handover;
@@ -36,7 +37,7 @@ public class InternalRowCollector implements Collector<SeaTunnelRow> {
     public InternalRowCollector(Handover<InternalRow> handover, Object checkpointLock, SeaTunnelDataType<?> dataType) {
         this.handover = handover;
         this.checkpointLock = checkpointLock;
-        this.rowSerialization = new InternalRowConverter(dataType);
+        this.rowSerialization = new InternalRowConverter(new DataTypeInfo(true, dataType, null));
         this.collectTotalCount = new AtomicLong(0);
     }
 

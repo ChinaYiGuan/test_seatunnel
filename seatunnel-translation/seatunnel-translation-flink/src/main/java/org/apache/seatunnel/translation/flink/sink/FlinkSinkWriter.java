@@ -28,6 +28,7 @@ import org.apache.seatunnel.translation.flink.statistics.SinkStatistics;
 
 import java.io.IOException;
 import java.io.InvalidClassException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,7 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
     FlinkSinkWriter(org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter,
                     long checkpointId,
                     SinkStatistics sinkStatistics) {
+//        System.err.println(this + " [LOG] -> init:" + Arrays.asList(sinkWriter,checkpointId,sinkStatistics));
         this.sinkWriter = sinkWriter;
         this.checkpointId = checkpointId;
         this.sinkStatistics = sinkStatistics;
@@ -56,6 +58,7 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
 
     @Override
     public void write(InputT element, org.apache.flink.api.connector.sink.SinkWriter.Context context) throws IOException {
+//        System.err.println(this + " [LOG] -> write:" + context);
         if (element instanceof Row) {
             Row record = (Row) element;
             this.sinkStatistics.statistics(record);
@@ -67,12 +70,14 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
 
     @Override
     public List<CommitWrapper<CommT>> prepareCommit(boolean flush) throws IOException {
+//        System.err.println(this + " [LOG] -> prepareCommit:" + flush);
         Optional<CommT> commTOptional = sinkWriter.prepareCommit();
         return commTOptional.map(CommitWrapper::new).map(Collections::singletonList).orElse(Collections.emptyList());
     }
 
     @Override
     public List<FlinkWriterState<WriterStateT>> snapshotState() throws IOException {
+//        System.err.println(this + " [LOG] -> snapshotState:" + null);
         List<FlinkWriterState<WriterStateT>> states = sinkWriter.snapshotState(this.checkpointId)
                 .stream().map(state -> new FlinkWriterState<>(this.checkpointId, state)).collect(Collectors.toList());
         this.checkpointId++;
@@ -81,6 +86,7 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
 
     @Override
     public void close() throws Exception {
+//        System.err.println(this + " [LOG] -> close:" + null);
         sinkWriter.close();
         this.sinkStatistics.close();
     }

@@ -17,18 +17,10 @@
 
 package org.apache.seatunnel.connectors.seatunnel.hive.sink;
 
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.FIELD_DELIMITER;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.FILE_FORMAT;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.FILE_NAME_EXPRESSION;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.FILE_PATH;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.IS_PARTITION_FIELD_WRITE_IN_FILE;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.PARTITION_BY;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.ROW_DELIMITER;
-import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.SINK_COLUMNS;
-import static org.apache.seatunnel.connectors.seatunnel.hive.config.HiveConfig.ORC_OUTPUT_FORMAT_CLASSNAME;
-import static org.apache.seatunnel.connectors.seatunnel.hive.config.HiveConfig.PARQUET_OUTPUT_FORMAT_CLASSNAME;
-import static org.apache.seatunnel.connectors.seatunnel.hive.config.HiveConfig.TEXT_OUTPUT_FORMAT_CLASSNAME;
-
+import com.google.auto.service.AutoService;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -40,20 +32,15 @@ import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.file.config.FileFormat;
 import org.apache.seatunnel.connectors.seatunnel.file.config.HadoopConf;
 import org.apache.seatunnel.connectors.seatunnel.file.hdfs.sink.BaseHdfsFileSink;
+import org.apache.seatunnel.connectors.seatunnel.file.hdfs.source.config.HdfsSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileAggregatedCommitInfo;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileCommitInfo;
 import org.apache.seatunnel.connectors.seatunnel.hive.commit.HiveSinkAggregatedCommitter;
 import org.apache.seatunnel.connectors.seatunnel.hive.config.HiveConfig;
 import org.apache.seatunnel.connectors.seatunnel.hive.exception.HiveConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.hive.exception.HiveConnectorException;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValueFactory;
-
-import com.google.auto.service.AutoService;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Table;
 
 import java.io.IOException;
 import java.net.URI;
@@ -62,6 +49,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig.*;
+import static org.apache.seatunnel.connectors.seatunnel.hive.config.HiveConfig.*;
 
 @AutoService(SeaTunnelSink.class)
 public class HiveSink extends BaseHdfsFileSink {
@@ -76,12 +66,12 @@ public class HiveSink extends BaseHdfsFileSink {
 
     @Override
     public void prepare(Config pluginConfig) throws PrepareFailException {
-        CheckResult result = CheckConfigUtil.checkAllExists(pluginConfig, HiveConfig.METASTORE_URI.key(),
-                HiveConfig.TABLE_NAME.key());
-        if (!result.isSuccess()) {
+        CheckResult result1 = CheckConfigUtil.checkAllExists(pluginConfig, HiveConfig.METASTORE_URI.key(), HiveConfig.TABLE_NAME.key());
+        CheckResult result2 = CheckConfigUtil.checkAllExists(pluginConfig, HiveConfig.JDBC_USERNAME.key(), HiveConfig.TABLE_NAME.key());
+        if (!result1.isSuccess() && !result2.isSuccess()) {
             throw new HiveConnectorException(SeaTunnelAPIErrorCode.CONFIG_VALIDATION_FAILED,
                     String.format("PluginName: %s, PluginType: %s, Message: %s",
-                            getPluginName(), PluginType.SINK, result.getMsg()));
+                            getPluginName(), PluginType.SINK, result1.isSuccess() ? result2.getMsg() : result1.getMsg()));
         }
         Pair<String[], Table> tableInfo = HiveConfig.getTableInfo(pluginConfig);
         dbName = tableInfo.getLeft()[0];
@@ -98,8 +88,8 @@ public class HiveSink extends BaseHdfsFileSink {
         if (TEXT_OUTPUT_FORMAT_CLASSNAME.equals(outputFormat)) {
             Map<String, String> parameters = tableInformation.getSd().getSerdeInfo().getParameters();
             pluginConfig = pluginConfig.withValue(FILE_FORMAT.key(), ConfigValueFactory.fromAnyRef(FileFormat.TEXT.toString()))
-                .withValue(FIELD_DELIMITER.key(), ConfigValueFactory.fromAnyRef(parameters.get("field.delim")))
-                .withValue(ROW_DELIMITER.key(), ConfigValueFactory.fromAnyRef(parameters.get("line.delim")));
+                    .withValue(FIELD_DELIMITER.key(), ConfigValueFactory.fromAnyRef(parameters.get("field.delim")))
+                    .withValue(ROW_DELIMITER.key(), ConfigValueFactory.fromAnyRef(parameters.get("line.delim")));
         } else if (PARQUET_OUTPUT_FORMAT_CLASSNAME.equals(outputFormat)) {
             pluginConfig = pluginConfig.withValue(FILE_FORMAT.key(), ConfigValueFactory.fromAnyRef(FileFormat.PARQUET.toString()));
         } else if (ORC_OUTPUT_FORMAT_CLASSNAME.equals(outputFormat)) {
@@ -120,6 +110,9 @@ public class HiveSink extends BaseHdfsFileSink {
             String path = uri.getPath();
             pluginConfig = pluginConfig.withValue(FILE_PATH.key(), ConfigValueFactory.fromAnyRef(path));
             hadoopConf = new HadoopConf(hdfsLocation.replace(path, ""));
+            if (pluginConfig.hasPath(HdfsSourceConfig.HDFS_SITE_PATH.key())) {
+                hadoopConf.setHdfsSitePath(pluginConfig.getString(HdfsSourceConfig.HDFS_SITE_PATH.key()));
+            }
         } catch (URISyntaxException e) {
             String errorMsg = String.format("Get hdfs namenode host from table location [%s] failed," +
                     "please check it", hdfsLocation);

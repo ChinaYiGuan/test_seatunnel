@@ -34,8 +34,6 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigResolveOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValue;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -127,7 +125,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
      * @param pluginType plugin type, not support transform
      * @return the all plugin identifier of the engine with artifactId
      */
-    public static @Nonnull Map<PluginIdentifier, String> getAllSupportedPlugins(PluginType pluginType) {
+    public static /*@NonNull*/ Map<PluginIdentifier, String> getAllSupportedPlugins(PluginType pluginType) {
         Config config = loadConnectorPluginConfig();
         Map<PluginIdentifier, String> pluginIdentifiers = new HashMap<>();
         if (config.isEmpty() || !config.hasPath(CollectionConstants.SEATUNNEL_PLUGIN)) {
@@ -252,7 +250,7 @@ public abstract class AbstractPluginDiscovery<T> implements PluginDiscovery<T> {
         return plugins;
     }
 
-    @Nullable
+//    @Nullable
     private T loadPluginInstance(PluginIdentifier pluginIdentifier, ClassLoader classLoader) {
         ServiceLoader<T> serviceLoader = ServiceLoader.load(getPluginBaseClass(), classLoader);
         log.info("instantiate plugin:【{}】, classLoader:【{}】", pluginIdentifier.getPluginName(), classLoader);

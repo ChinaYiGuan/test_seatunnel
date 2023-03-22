@@ -36,9 +36,9 @@ import org.apache.seatunnel.connectors.seatunnel.file.sink.state.FileSinkState;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.util.FileSystemUtils;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.WriteStrategy;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.WriteStrategyFactory;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -62,11 +62,16 @@ public abstract class BaseFileSink implements SeaTunnelSink<SeaTunnelRow, FileSi
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
         this.seaTunnelRowType = seaTunnelRowType;
-        this.fileSinkConfig = new FileSinkConfig(pluginConfig, seaTunnelRowType);
+        this.fileSinkConfig = new FileSinkConfig(pluginConfig, seaTunnelRowType, this::separator);
         this.writeStrategy = WriteStrategyFactory.of(fileSinkConfig.getFileFormat(), fileSinkConfig);
         this.fileSystemUtils = new FileSystemUtils(hadoopConf);
         this.writeStrategy.setSeaTunnelRowTypeInfo(seaTunnelRowType);
         this.writeStrategy.setFileSystemUtils(fileSystemUtils);
+        this.writeStrategy.setSeparator(separator());
+    }
+
+    protected String separator() {
+        return File.separator;
     }
 
     @Override

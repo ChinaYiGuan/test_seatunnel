@@ -117,12 +117,15 @@
         <seatunnel.config.shade.version>2.1.1</seatunnel.config.shade.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <scala.version>2.11.12</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
+<!--        <scala.binary.version>2.12</scala.binary.version>-->
+        <scala.version>${scala.binary.version}.12</scala.version>
+<!--        <scala.version>${scala.binary.version}.17</scala.version>-->
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
-        <slf4j.version>1.7.25</slf4j.version>
+<!--        <slf4j.version>1.7.25</slf4j.version>-->
+        <slf4j.version>1.7.36</slf4j.version>
         <log4j2.version>2.17.1</log4j2.version>
         <log4j2-disruptor.version>3.4.4</log4j2-disruptor.version>
         <log4j.version>1.2.17</log4j.version>
@@ -130,6 +133,7 @@
         <commons-logging.version>1.2</commons-logging.version>
         <iceberg.version>0.13.1</iceberg.version>
         <flink.1.13.6.version>1.13.6</flink.1.13.6.version>
+<!--        <flink.1.13.6.version>1.16.1</flink.1.13.6.version>-->
         <spark.2.4.0.version>2.4.0</spark.2.4.0.version>
         <spark.binary.2.4.version>2.4</spark.binary.2.4.version>
         <commons.beanutils.version>1.9.4</commons.beanutils.version>

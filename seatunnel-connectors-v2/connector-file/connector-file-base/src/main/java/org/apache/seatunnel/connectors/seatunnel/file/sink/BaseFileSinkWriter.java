@@ -17,9 +17,11 @@
 
 package org.apache.seatunnel.connectors.seatunnel.file.sink;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.config.HadoopConf;
 import org.apache.seatunnel.connectors.seatunnel.file.exception.FileConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileAggregatedCommitInfo;
@@ -27,17 +29,10 @@ import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileCommitInfo
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileSinkAggregatedCommitter;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.state.FileSinkState;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.util.FileSystemUtils;
-import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.AbstractWriteStrategy;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.WriteStrategy;
 
-import org.apache.hadoop.fs.Path;
-
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class BaseFileSinkWriter implements SinkWriter<SeaTunnelRow, FileCommitInfo, FileSinkState> {
@@ -65,15 +60,15 @@ public class BaseFileSinkWriter implements SinkWriter<SeaTunnelRow, FileCommitIn
                 FileSinkAggregatedCommitter fileSinkAggregatedCommitter = new FileSinkAggregatedCommitter(fileSystemUtils);
                 HashMap<String, FileSinkState> fileStatesMap = new HashMap<>();
                 fileSinkStates.forEach(fileSinkState ->
-                    fileStatesMap.put(fileSinkState.getTransactionId(), fileSinkState));
+                        fileStatesMap.put(fileSinkState.getTransactionId(), fileSinkState));
                 for (String transaction : transactions) {
                     if (fileStatesMap.containsKey(transaction)) {
                         // need commit
                         FileSinkState fileSinkState = fileStatesMap.get(transaction);
                         FileAggregatedCommitInfo fileCommitInfo = fileSinkAggregatedCommitter
-                            .combine(Collections.singletonList(new FileCommitInfo(fileSinkState.getNeedMoveFiles(),
-                                fileSinkState.getPartitionDirAndValuesMap(),
-                                fileSinkState.getTransactionDir())));
+                                .combine(Collections.singletonList(new FileCommitInfo(fileSinkState.getNeedMoveFiles(),
+                                        fileSinkState.getPartitionDirAndValuesMap(),
+                                        fileSinkState.getTransactionDir())));
                         fileSinkAggregatedCommitter.commit(Collections.singletonList(fileCommitInfo));
                     } else {
                         // need abort
@@ -91,10 +86,14 @@ public class BaseFileSinkWriter implements SinkWriter<SeaTunnelRow, FileCommitIn
     }
 
     private List<String> findTransactionList(String jobId, String uuidPrefix) throws IOException {
-        return fileSystemUtils.dirList(AbstractWriteStrategy.getTransactionDirPrefix(writeStrategy
-                                .getFileSinkConfig().getTmpPath(),
-                        jobId, uuidPrefix))
-            .stream().map(Path::getName).collect(Collectors.toList());
+        final String joinPath = String.join(writeStrategy.getSeparator(), new String[]{
+                writeStrategy.getFileSinkConfig().getTmpPath(),
+                BaseSinkConfig.SEATUNNEL,
+                jobId,
+                uuidPrefix
+        });
+        return fileSystemUtils.dirList(joinPath)
+                .stream().map(Path::getName).collect(Collectors.toList());
     }
 
     public BaseFileSinkWriter(WriteStrategy writeStrategy, HadoopConf hadoopConf, SinkWriter.Context context, String jobId) {

@@ -17,17 +17,8 @@
 
 package org.apache.seatunnel.flink;
 
-import org.apache.seatunnel.apis.base.env.RuntimeEnv;
-import org.apache.seatunnel.common.config.CheckResult;
-import org.apache.seatunnel.common.constants.JobMode;
-import org.apache.seatunnel.common.utils.ReflectionUtils;
-import org.apache.seatunnel.flink.util.ConfigKeyName;
-import org.apache.seatunnel.flink.util.EnvironmentUtil;
-import org.apache.seatunnel.flink.util.TableUtil;
-
-import org.apache.seatunnel.shade.com.typesafe.config.Config;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -47,11 +38,19 @@ import org.apache.flink.table.api.bridge.java.BatchTableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.TernaryBoolean;
+import org.apache.seatunnel.apis.base.env.RuntimeEnv;
+import org.apache.seatunnel.common.PropertiesUtil;
+import org.apache.seatunnel.common.config.CheckResult;
+import org.apache.seatunnel.common.constants.JobMode;
+import org.apache.seatunnel.common.utils.EnvUtil;
+import org.apache.seatunnel.common.utils.ReflectionUtils;
+import org.apache.seatunnel.flink.util.ConfigKeyName;
+import org.apache.seatunnel.flink.util.EnvironmentUtil;
+import org.apache.seatunnel.flink.util.TableUtil;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -129,8 +128,8 @@ public class FlinkEnvironment implements RuntimeEnv {
         List<Configuration> configurations = new ArrayList<>();
         try {
             configurations.add((Configuration) Objects.requireNonNull(ReflectionUtils.getDeclaredMethod(StreamExecutionEnvironment.class,
-                "getConfiguration")).orElseThrow(() -> new RuntimeException("can't find " +
-                "method: getConfiguration")).invoke(this.environment));
+                    "getConfiguration")).orElseThrow(() -> new RuntimeException("can't find " +
+                    "method: getConfiguration")).invoke(this.environment));
             if (!isStreaming()) {
                 configurations.add(batchEnvironment.getConfiguration());
             }
@@ -164,9 +163,9 @@ public class FlinkEnvironment implements RuntimeEnv {
     private void createStreamTableEnvironment() {
         // use blink and streammode
         EnvironmentSettings.Builder envBuilder = EnvironmentSettings.newInstance()
-            .inStreamingMode();
+                .inStreamingMode();
         if (this.config.hasPath(ConfigKeyName.PLANNER) && "blink"
-            .equals(this.config.getString(ConfigKeyName.PLANNER))) {
+                .equals(this.config.getString(ConfigKeyName.PLANNER))) {
             envBuilder.useBlinkPlanner();
         } else {
             envBuilder.useOldPlanner();
@@ -176,7 +175,7 @@ public class FlinkEnvironment implements RuntimeEnv {
         tableEnvironment = StreamTableEnvironment.create(getStreamExecutionEnvironment(), environmentSettings);
         TableConfig config = tableEnvironment.getConfig();
         if (this.config.hasPath(ConfigKeyName.MAX_STATE_RETENTION_TIME) && this.config
-            .hasPath(ConfigKeyName.MIN_STATE_RETENTION_TIME)) {
+                .hasPath(ConfigKeyName.MIN_STATE_RETENTION_TIME)) {
             long max = this.config.getLong(ConfigKeyName.MAX_STATE_RETENTION_TIME);
             long min = this.config.getLong(ConfigKeyName.MIN_STATE_RETENTION_TIME);
             config.setIdleStateRetentionTime(Time.seconds(min), Time.seconds(max));
@@ -186,6 +185,11 @@ public class FlinkEnvironment implements RuntimeEnv {
     private void createStreamEnvironment() {
         Configuration configuration = new Configuration();
         EnvironmentUtil.initConfiguration(config, configuration);
+
+        Properties prop = new Properties();
+        PropertiesUtil.setProperties(config, prop, EnvUtil.getEnv("flink.env.prefix", "_flink."), false);
+        prop.forEach((k, v) -> configuration.setString(Objects.nonNull(k) ? k.toString() : null, Objects.nonNull(v) ? v.toString() : null));
+
         environment = StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         setTimeCharacteristic();
 
@@ -249,8 +253,8 @@ public class FlinkEnvironment implements RuntimeEnv {
                     break;
                 default:
                     log.warn(
-                        "set time-characteristic failed, unknown time-characteristic [{}],only support event-time,ingestion-time,processing-time",
-                        timeType);
+                            "set time-characteristic failed, unknown time-characteristic [{}],only support event-time,ingestion-time,processing-time",
+                            timeType);
                     break;
             }
         }
@@ -273,8 +277,8 @@ public class FlinkEnvironment implements RuntimeEnv {
                         break;
                     default:
                         log.warn(
-                            "set checkpoint.mode failed, unknown checkpoint.mode [{}],only support exactly-once,at-least-once",
-                            mode);
+                                "set checkpoint.mode failed, unknown checkpoint.mode [{}],only support exactly-once,at-least-once",
+                                mode);
                         break;
                 }
             }
@@ -307,10 +311,10 @@ public class FlinkEnvironment implements RuntimeEnv {
                 boolean cleanup = config.getBoolean(ConfigKeyName.CHECKPOINT_CLEANUP_MODE);
                 if (cleanup) {
                     checkpointConfig.enableExternalizedCheckpoints(
-                        CheckpointConfig.ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION);
+                            CheckpointConfig.ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION);
                 } else {
                     checkpointConfig.enableExternalizedCheckpoints(
-                        CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
+                            CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
 
                 }
             }

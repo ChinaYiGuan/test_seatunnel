@@ -17,11 +17,12 @@
 
 package org.apache.seatunnel.connectors.seatunnel.file.sink.writer;
 
-import static org.apache.parquet.avro.AvroReadSupport.READ_INT96_AS_FIXED;
-import static org.apache.parquet.avro.AvroSchemaConverter.ADD_LIST_ELEMENT_RECORDS;
-import static org.apache.parquet.avro.AvroWriteSupport.WRITE_FIXED_AS_INT96;
-import static org.apache.parquet.avro.AvroWriteSupport.WRITE_OLD_LIST_STRUCTURE;
-
+import com.google.common.collect.Lists;
+import lombok.NonNull;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.Constants;
@@ -35,13 +36,6 @@ import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileCommitInfo
 import org.apache.seatunnel.connectors.seatunnel.file.sink.config.FileSinkConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.state.FileSinkState;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.util.FileSystemUtils;
-
-import com.google.common.collect.Lists;
-import lombok.NonNull;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,14 +43,14 @@ import java.io.File;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
+
+import static org.apache.parquet.avro.AvroReadSupport.READ_INT96_AS_FIXED;
+import static org.apache.parquet.avro.AvroSchemaConverter.ADD_LIST_ELEMENT_RECORDS;
+import static org.apache.parquet.avro.AvroWriteSupport.WRITE_FIXED_AS_INT96;
+import static org.apache.parquet.avro.AvroWriteSupport.WRITE_OLD_LIST_STRUCTURE;
 
 public abstract class AbstractWriteStrategy implements WriteStrategy {
     protected final Logger log = LoggerFactory.getLogger(this.getClass());
@@ -83,6 +77,8 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
     protected int batchSize;
     protected int currentBatchSize = 0;
 
+    protected String separator;
+
     public AbstractWriteStrategy(FileSinkConfig fileSinkConfig) {
         this.fileSinkConfig = fileSinkConfig;
         this.sinkColumnsIndexInRow = fileSinkConfig.getSinkColumnsIndexInRow();
@@ -100,6 +96,7 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
         this.jobId = jobId;
         this.subTaskIndex = subTaskIndex;
         this.uuidPrefix = uuidPrefix;
+        log.info("Start preparing to write file:【{}】, Temporary path:【{}】", fileSinkConfig.getFilePath(), fileSinkConfig.getTmpPath());
     }
 
     @Override
@@ -219,6 +216,7 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
      */
     @Override
     public Optional<FileCommitInfo> prepareCommit() {
+        log.info("Finish writing to write file:【{}】, Temporary path:【{}】", fileSinkConfig.getFilePath(), fileSinkConfig.getTmpPath());
         this.finishAndCloseFile();
         Map<String, String> commitMap = new HashMap<>(this.needMoveFiles);
         Map<String, List<String>> copyMap = this.partitionDirAndValuesMap.entrySet().stream()
@@ -236,6 +234,7 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
 
     /**
      * abort prepare commit operation using transaction directory
+     *
      * @param transactionId transaction id
      */
     public void abortPrepare(String transactionId) {
@@ -249,6 +248,7 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
 
     /**
      * when a checkpoint completed, file connector should begin a new transaction and generate new transaction id
+     *
      * @param checkpointId checkpoint id
      */
     public void beginTransaction(Long checkpointId) {
@@ -261,8 +261,8 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
 
     private String getTransactionId(Long checkpointId) {
         return "T" + BaseSinkConfig.TRANSACTION_ID_SPLIT + jobId + BaseSinkConfig.TRANSACTION_ID_SPLIT
-            + uuidPrefix + BaseSinkConfig.TRANSACTION_ID_SPLIT + subTaskIndex + BaseSinkConfig.TRANSACTION_ID_SPLIT
-            + checkpointId;
+                + uuidPrefix + BaseSinkConfig.TRANSACTION_ID_SPLIT + subTaskIndex + BaseSinkConfig.TRANSACTION_ID_SPLIT
+                + checkpointId;
     }
 
     /**
@@ -274,10 +274,10 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
     @Override
     public List<FileSinkState> snapshotState(long checkpointId) {
         Map<String, List<String>> commitMap = this.partitionDirAndValuesMap.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> new ArrayList<>(e.getValue())));
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> new ArrayList<>(e.getValue())));
         ArrayList<FileSinkState> fileState = Lists.newArrayList(new FileSinkState(this.transactionId,
-            this.uuidPrefix, this.checkpointId, new HashMap<>(this.needMoveFiles),
-            commitMap, this.getTransactionDir(transactionId)));
+                this.uuidPrefix, this.checkpointId, new HashMap<>(this.needMoveFiles),
+                commitMap, this.getTransactionDir(transactionId)));
         this.beingWrittenFile.clear();
         this.beginTransaction(checkpointId + 1);
         return fileState;
@@ -291,12 +291,12 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
      */
     private String getTransactionDir(@NonNull String transactionId) {
         String transactionDirectoryPrefix = getTransactionDirPrefix(fileSinkConfig.getTmpPath(), jobId, uuidPrefix);
-        return String.join(File.separator, new String[]{transactionDirectoryPrefix, transactionId});
+        return String.join(this.separator, new String[]{transactionDirectoryPrefix, transactionId});
     }
 
-    public static String getTransactionDirPrefix(String tmpPath, String jobId, String uuidPrefix) {
+    public String getTransactionDirPrefix(String tmpPath, String jobId, String uuidPrefix) {
         String[] strings = new String[]{tmpPath, BaseSinkConfig.SEATUNNEL, jobId, uuidPrefix};
-        return String.join(File.separator, strings);
+        return String.join(this.separator, strings);
     }
 
     public String getOrCreateFilePathBeingWritten(@NonNull SeaTunnelRow seaTunnelRow) {
@@ -308,9 +308,9 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
             return beingWrittenFilePath;
         } else {
             String[] pathSegments = new String[]{transactionDirectory, beingWrittenFileKey, generateFileName(transactionId)};
-            String newBeingWrittenFilePath = String.join(File.separator, pathSegments);
+            String newBeingWrittenFilePath = String.join(this.separator, pathSegments);
             beingWrittenFile.put(beingWrittenFileKey, newBeingWrittenFilePath);
-            if (!BaseSinkConfig.NON_PARTITION.equals(dataPartitionDirAndValuesMap.keySet().toArray()[0].toString())){
+            if (!BaseSinkConfig.NON_PARTITION.equals(dataPartitionDirAndValuesMap.keySet().toArray()[0].toString())) {
                 partitionDirAndValuesMap.putAll(dataPartitionDirAndValuesMap);
             }
             return newBeingWrittenFilePath;
@@ -320,7 +320,7 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
     public String getTargetLocation(@NonNull String seaTunnelFilePath) {
         String tmpPath = seaTunnelFilePath.replaceAll(Matcher.quoteReplacement(transactionDirectory),
                 Matcher.quoteReplacement(fileSinkConfig.getPath()));
-        return tmpPath.replaceAll(BaseSinkConfig.NON_PARTITION + Matcher.quoteReplacement(File.separator), "");
+        return tmpPath.replaceAll(BaseSinkConfig.NON_PARTITION + Matcher.quoteReplacement(this.separator), "");
     }
 
     @Override
@@ -342,4 +342,13 @@ public abstract class AbstractWriteStrategy implements WriteStrategy {
     public void setFileSystemUtils(FileSystemUtils fileSystemUtils) {
         this.fileSystemUtils = fileSystemUtils;
     }
+
+    public void setSeparator(String separator) {
+        this.separator = separator;
+    }
+
+    public String getSeparator() {
+        return this.separator;
+    }
+
 }

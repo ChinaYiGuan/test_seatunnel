@@ -43,6 +43,7 @@ import org.apache.seatunnel.translation.source.BaseSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +72,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     private volatile boolean running = true;
 
     public BaseSeaTunnelSourceFunction(SeaTunnelSource<SeaTunnelRow, ?, ?> source, Config sourceCfg) {
+//        System.err.println(this + " [LOG] -> init:" + Arrays.asList(source,sourceCfg));
         this.source = source;
         this.sourceCfg = sourceCfg;
         this.sourceStatistics = new SourceStatistics(sourceCfg, source);
@@ -79,6 +81,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
+//        System.err.println(this + " [LOG] -> open:" + parameters);
         this.internalSource = createInternalSource();
         this.internalSource.open();
         this.sourceStatistics.open();
@@ -89,6 +92,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
     public void run(SourceFunction.SourceContext<Row> sourceContext) throws Exception {
+//        System.err.println(this + " [LOG] -> run:" + sourceContext);
         internalSource.run(new RowCollector(sourceContext, sourceContext.getCheckpointLock(), sourceStatistics));
 
         // Wait for a checkpoint to complete:
@@ -104,6 +108,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
 
     @Override
     public void close() throws Exception {
+//        System.err.println(this + " [LOG] -> close:" + null);
         cancel();
         this.sourceStatistics.close();
         LOG.debug("Close the SeaTunnelSourceFunction of Flink.");
@@ -111,6 +116,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
 
     @Override
     public void cancel() {
+//        System.err.println(this + " [LOG] -> cancel:" + null);
         running = false;
         try {
             if (internalSource != null) {
@@ -124,23 +130,27 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
+//        System.err.println(this + " [LOG] -> notifyCheckpointComplete:" + checkpointId);
         internalSource.notifyCheckpointComplete(checkpointId);
         latestCompletedCheckpointId.set(checkpointId);
     }
 
     @Override
     public void notifyCheckpointAborted(long checkpointId) throws Exception {
+//        System.err.println(this + " [LOG] -> notifyCheckpointAborted:" + checkpointId);
         internalSource.notifyCheckpointAborted(checkpointId);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public TypeInformation<Row> getProducedType() {
+//        System.err.println(this + " [LOG] -> getProducedType:" + null);
         return (TypeInformation<Row>) TypeConverterUtils.convert(source.getDynamicProducedType(source));
     }
 
     @Override
     public void snapshotState(FunctionSnapshotContext snapshotContext) throws Exception {
+//        System.err.println(this + " [LOG] -> snapshotState:" + snapshotContext);
         final long checkpointId = snapshotContext.getCheckpointId();
         latestTriggerCheckpointId.set(checkpointId);
         if (!running) {
@@ -153,6 +163,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
 
     @Override
     public void initializeState(FunctionInitializationContext initializeContext) throws Exception {
+//        System.err.println(this + " [LOG] -> initializeState:" + initializeContext);
         this.sourceState = initializeContext.getOperatorStateStore()
                 .getListState(
                         new ListStateDescriptor<>(

@@ -17,8 +17,6 @@
 
 package org.apache.seatunnel.connectors.seatunnel.file.hdfs.sink;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
-
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.common.config.CheckConfigUtil;
@@ -28,8 +26,9 @@ import org.apache.seatunnel.connectors.seatunnel.file.config.HadoopConf;
 import org.apache.seatunnel.connectors.seatunnel.file.exception.FileConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.file.hdfs.source.config.HdfsSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.BaseFileSink;
-
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 
 public abstract class BaseHdfsFileSink extends BaseFileSink {
 
@@ -46,5 +45,11 @@ public abstract class BaseHdfsFileSink extends BaseFileSink {
         if (pluginConfig.hasPath(HdfsSourceConfig.HDFS_SITE_PATH.key())) {
             hadoopConf.setHdfsSitePath(pluginConfig.getString(HdfsSourceConfig.HDFS_SITE_PATH.key()));
         }
+    }
+
+
+    @Override
+    protected String separator() {
+        return "/";
     }
 }

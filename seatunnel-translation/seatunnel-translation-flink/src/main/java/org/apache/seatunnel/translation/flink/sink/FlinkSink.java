@@ -32,6 +32,7 @@ import org.apache.seatunnel.translation.flink.serialization.FlinkWriterStateSeri
 import org.apache.seatunnel.translation.flink.statistics.SinkStatistics;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -44,6 +45,7 @@ public class FlinkSink<InputT, CommT, WriterStateT, GlobalCommT> implements Sink
     private final SinkStatistics sinkStatistics;
 
     public FlinkSink(SeaTunnelSink<SeaTunnelRow, WriterStateT, CommT, GlobalCommT> sink, Config sinkCfg) {
+//        System.err.println(this + " [LOG] -> init:" + Arrays.asList(sink,sinkCfg));
         this.sink = sink;
         this.sinkCfg = sinkCfg;
         this.sinkStatistics = new SinkStatistics(sinkCfg, sink);
@@ -51,6 +53,7 @@ public class FlinkSink<InputT, CommT, WriterStateT, GlobalCommT> implements Sink
 
     @Override
     public SinkWriter<InputT, CommitWrapper<CommT>, FlinkWriterState<WriterStateT>> createWriter(org.apache.flink.api.connector.sink.Sink.InitContext context, List<FlinkWriterState<WriterStateT>> states) throws IOException {
+//        System.err.println(this + " [LOG] -> createWriter:" + Arrays.asList(context,states));
         this.sinkStatistics.open();
         org.apache.seatunnel.api.sink.SinkWriter.Context stContext = new DefaultSinkWriterContext(context.getSubtaskId());
         if (states == null || states.isEmpty()) {
@@ -64,26 +67,31 @@ public class FlinkSink<InputT, CommT, WriterStateT, GlobalCommT> implements Sink
 
     @Override
     public Optional<Committer<CommitWrapper<CommT>>> createCommitter() throws IOException {
+//        System.err.println(this + " [LOG] -> createCommitter:" + null);
         return sink.createCommitter().map(FlinkCommitter::new);
     }
 
     @Override
     public Optional<GlobalCommitter<CommitWrapper<CommT>, GlobalCommT>> createGlobalCommitter() throws IOException {
+//        System.err.println(this + " [LOG] -> createGlobalCommitter:" + null);
         return sink.createAggregatedCommitter().map(FlinkGlobalCommitter::new);
     }
 
     @Override
     public Optional<SimpleVersionedSerializer<CommitWrapper<CommT>>> getCommittableSerializer() {
+//        System.err.println(this + " [LOG] -> getCommittableSerializer:" + null);
         return sink.getCommitInfoSerializer().map(CommitWrapperSerializer::new);
     }
 
     @Override
     public Optional<SimpleVersionedSerializer<GlobalCommT>> getGlobalCommittableSerializer() {
+//        System.err.println(this + " [LOG] -> getGlobalCommittableSerializer:" + null);
         return sink.getAggregatedCommitInfoSerializer().map(FlinkSimpleVersionedSerializer::new);
     }
 
     @Override
     public Optional<SimpleVersionedSerializer<FlinkWriterState<WriterStateT>>> getWriterStateSerializer() {
+//        System.err.println(this + " [LOG] -> getWriterStateSerializer:" + null);
         return sink.getWriterStateSerializer().map(FlinkWriterStateSerializer::new);
     }
 }

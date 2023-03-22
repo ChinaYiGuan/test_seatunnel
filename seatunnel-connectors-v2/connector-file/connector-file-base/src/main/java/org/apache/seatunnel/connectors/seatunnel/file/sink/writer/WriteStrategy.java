@@ -100,4 +100,7 @@ public interface WriteStrategy extends Transaction, Serializable {
      * @param fileSystemUtils fileSystemUtils
      */
     void setFileSystemUtils(FileSystemUtils fileSystemUtils);
+
+    void setSeparator(String separator);
+    String getSeparator();
 }

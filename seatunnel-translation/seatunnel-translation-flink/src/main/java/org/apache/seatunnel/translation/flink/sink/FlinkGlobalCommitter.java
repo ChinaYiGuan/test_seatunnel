@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.translation.flink.sink;
 
+import cn.hutool.aop.ProxyUtil;
 import org.apache.seatunnel.api.sink.SinkAggregatedCommitter;
 
 import lombok.extern.slf4j.Slf4j;
@@ -34,16 +35,19 @@ public class FlinkGlobalCommitter<CommT, GlobalCommT> implements GlobalCommitter
     private final SinkAggregatedCommitter<CommT, GlobalCommT> aggregatedCommitter;
 
     FlinkGlobalCommitter(SinkAggregatedCommitter<CommT, GlobalCommT> aggregatedCommitter) {
+//        System.err.println(this + " [LOG] -> init:" + aggregatedCommitter);
         this.aggregatedCommitter = aggregatedCommitter;
     }
 
     @Override
     public List<GlobalCommT> filterRecoveredCommittables(List globalCommittables) throws IOException {
+//        System.err.println(this + " [LOG] -> filterRecoveredCommittables:" + globalCommittables);
         return Collections.emptyList();
     }
 
     @Override
     public GlobalCommT combine(List<CommitWrapper<CommT>> committables) throws IOException {
+//        System.err.println(this + " [LOG] -> combine:" + committables);
         return aggregatedCommitter.combine(committables.stream()
             .map(CommitWrapper::getCommit)
             .collect(Collectors.toList()));
@@ -51,6 +55,7 @@ public class FlinkGlobalCommitter<CommT, GlobalCommT> implements GlobalCommitter
 
     @Override
     public List<GlobalCommT> commit(List<GlobalCommT> globalCommittables) throws IOException {
+//        System.err.println(this + " [LOG] -> commit:" + globalCommittables);
         List<GlobalCommT> reCommittable = aggregatedCommitter.commit(globalCommittables);
         if (reCommittable != null && !reCommittable.isEmpty()) {
             log.warn("this version not support re-commit when use flink engine");
@@ -61,10 +66,12 @@ public class FlinkGlobalCommitter<CommT, GlobalCommT> implements GlobalCommitter
 
     @Override
     public void endOfInput() throws IOException {
+//        System.err.println(this + " [LOG] -> endOfInput:" + null);
     }
 
     @Override
     public void close() throws Exception {
+//        System.err.println(this + " [LOG] -> close:" + null);
         aggregatedCommitter.close();
     }
 }

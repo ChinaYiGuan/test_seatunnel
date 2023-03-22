@@ -36,6 +36,7 @@ public class SeaTunnelParallelSource extends BaseSeaTunnelSourceFunction impleme
 
     @Override
     protected BaseSourceFunction<SeaTunnelRow> createInternalSource() {
+//        System.err.println(this + " [LOG] -> createInternalSource:" + null);
         return new ParallelSource<>(source,
                 restoredState,
                 getRuntimeContext().getNumberOfParallelSubtasks(),

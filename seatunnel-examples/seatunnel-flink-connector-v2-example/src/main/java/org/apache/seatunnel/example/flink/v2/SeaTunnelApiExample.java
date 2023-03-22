@@ -37,7 +37,7 @@ public class SeaTunnelApiExample {
         System.setProperty("dataSourceToken", "bf77ef162b00c9d03bc8849ee1d60407");
         System.setProperty("is_show_parseDs", "all");
 
-        String cfgFile = "/examples/jdbc_to_doris.conf";
+        String cfgFile = "/examples/jdbc_to_hive.conf";
         String configurePath = args.length > 0 ? args[0] : cfgFile;
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();

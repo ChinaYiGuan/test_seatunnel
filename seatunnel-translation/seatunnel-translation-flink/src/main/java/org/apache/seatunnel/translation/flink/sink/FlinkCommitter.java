@@ -24,6 +24,7 @@ import org.apache.flink.api.connector.sink.Committer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,14 +34,16 @@ public class FlinkCommitter<CommT> implements Committer<CommitWrapper<CommT>> {
     private final SinkCommitter<CommT> sinkCommitter;
 
     FlinkCommitter(SinkCommitter<CommT> sinkCommitter) {
+//        System.err.println(this + " [LOG] -> init:" + sinkCommitter);
         this.sinkCommitter = sinkCommitter;
     }
 
     @Override
     public List<CommitWrapper<CommT>> commit(List<CommitWrapper<CommT>> committables) throws IOException {
+//        System.err.println(this + " [LOG] -> commit:" + committables);
         List<CommT> reCommittable = sinkCommitter.commit(committables.stream()
-            .map(CommitWrapper::getCommit)
-            .collect(Collectors.toList()));
+                .map(CommitWrapper::getCommit)
+                .collect(Collectors.toList()));
         if (reCommittable != null && !reCommittable.isEmpty()) {
             log.warn("this version not support re-commit when use flink engine");
         }
@@ -50,5 +53,6 @@ public class FlinkCommitter<CommT> implements Committer<CommitWrapper<CommT>> {
 
     @Override
     public void close() throws Exception {
+//        System.err.println(this + " [LOG] -> close:" + null);
     }
 }

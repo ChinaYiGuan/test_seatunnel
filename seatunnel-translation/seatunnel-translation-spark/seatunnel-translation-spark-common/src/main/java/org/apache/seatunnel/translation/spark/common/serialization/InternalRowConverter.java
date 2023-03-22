@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.translation.spark.common.serialization;
 
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.ArrayType;
 import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.MapType;
@@ -56,14 +57,14 @@ import java.util.Map;
 
 public final class InternalRowConverter extends RowConverter<InternalRow> {
 
-    public InternalRowConverter(SeaTunnelDataType<?> dataType) {
-        super(dataType);
+    public InternalRowConverter(DataTypeInfo dataTypeInfo) {
+        super(dataTypeInfo);
     }
 
     @Override
     public InternalRow convert(SeaTunnelRow seaTunnelRow) throws IOException {
         validate(seaTunnelRow);
-        return (InternalRow) convert(seaTunnelRow, dataType);
+        return (InternalRow) convert(seaTunnelRow, dataTypeInfo.getDataType());
     }
 
     private static Object convert(Object field, SeaTunnelDataType<?> dataType) {
@@ -175,7 +176,7 @@ public final class InternalRowConverter extends RowConverter<InternalRow> {
 
     @Override
     public SeaTunnelRow reconvert(InternalRow engineRow) throws IOException {
-        return (SeaTunnelRow) reconvert(engineRow, dataType);
+        return (SeaTunnelRow) reconvert(engineRow, dataTypeInfo.getDataType());
     }
 
     private static Object reconvert(Object field, SeaTunnelDataType<?> dataType) {

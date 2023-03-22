@@ -19,6 +19,7 @@ package org.apache.seatunnel.translation.spark.sink;
 
 import org.apache.seatunnel.api.sink.SinkCommitter;
 import org.apache.seatunnel.api.sink.SinkWriter;
+import org.apache.seatunnel.api.table.transfrom.DataTypeInfo;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.translation.serialization.RowConverter;
@@ -49,7 +50,9 @@ public class SparkDataWriter<CommitInfoT, StateT> implements DataWriter<Internal
                     SeaTunnelDataType<?> dataType, long epochId) {
         this.sinkWriter = sinkWriter;
         this.sinkCommitter = sinkCommitter;
-        this.rowConverter = new InternalRowConverter(dataType);
+        DataTypeInfo dataTypeInfo = new DataTypeInfo();
+        dataTypeInfo.setDataType(dataType);
+        this.rowConverter = new InternalRowConverter(new DataTypeInfo(true, dataType, null));
         this.epochId = epochId == 0 ? 1 : epochId;
     }
 
