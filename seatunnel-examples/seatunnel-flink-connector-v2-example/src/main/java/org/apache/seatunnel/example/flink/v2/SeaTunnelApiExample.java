@@ -33,11 +33,17 @@ public class SeaTunnelApiExample {
     public static void main(String[] args) throws FileNotFoundException, URISyntaxException, CommandException {
 //        System.setProperty("dataSourceHost", "http://10.192.147.2:12345");
 //        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
+//        System.setProperty("dataSourceHost", "http://10.192.147.1:12345");
+//        System.setProperty("dataSourceToken", "bf77ef162b00c9d03bc8849ee1d60407");
+//        System.setProperty("is_show_parseDs", "all");
+
+//        System.setProperty("dataSourceHost", "http://localhost:12345");
+//        System.setProperty("dataSourceToken", "701761fd7842afa31d14f9ecec5fd5d0");
         System.setProperty("dataSourceHost", "http://10.192.147.1:12345");
-        System.setProperty("dataSourceToken", "bf77ef162b00c9d03bc8849ee1d60407");
+        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
         System.setProperty("is_show_parseDs", "all");
 
-        String cfgFile = "/examples/jdbc_to_hive.conf";
+        String cfgFile = "/examples/uatDoris_to_proDoris-mltiple.conf";
         String configurePath = args.length > 0 ? args[0] : cfgFile;
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();

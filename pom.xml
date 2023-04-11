@@ -72,7 +72,7 @@
     <modules>
         <!--
             We retrieve the config module from maven repository. If you want to change the config module,
-            you need to open this annotation and change the dependency of config-shade to project.
+            you need to open this annotation and change the dependency of config-shade to project.ZZ`
             <module>seatunnel-config</module>
         -->
         <module>seatunnel-common</module>

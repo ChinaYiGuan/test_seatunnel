@@ -152,7 +152,7 @@ public class Common {
      */
     public static List<Path> getLibJars() {
         Path libRootDir = Common.libDir();
-        log.info("find lib jars -> 【{}】. example -> 【{}】", Common.libDir(), String.format("%s/[%s/]xxx.jar", Common.libDir(), "PLUGIN_NAME"));
+        log.info("find lib jars -> 【{}】. example -> 【{}】", Common.libDir(), String.format("%s/[%s]/xxx.jar", Common.libDir(), "PLUGIN_NAME"));
         if (!Files.exists(libRootDir) || !Files.isDirectory(libRootDir)) {
             return Collections.emptyList();
         }

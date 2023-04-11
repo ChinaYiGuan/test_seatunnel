@@ -125,7 +125,12 @@ public class DolphinDataSource implements BaseDataSource {
                 final Map<String, Object> remoteDataSourceMap = remoteReq(dataSourceName);
                 debugShow("[" + dataSourceName + "] remoteReq parse", remoteDataSourceMap);
                 if (remoteDataSourceMap.containsKey("password")) {
-                    remoteDataSourceMap.put("password", DesUtil.getInstance().decryptor(remoteDataSourceMap.getOrDefault("password", "").toString()));
+                    String srcPassword = remoteDataSourceMap.getOrDefault("password", "").toString();
+                    String desPassword = DesUtil.getInstance().decryptor(srcPassword);
+                    remoteDataSourceMap.put("password", desPassword);
+                    if (StringUtils.isBlank(desPassword)) {
+                        log.warn("des pass err, src:{}, dest:{}", srcPassword, desPassword);
+                    }
                 }
                 log.info("parsing completed. data source:【{}】, size:【{}】", remoteDataSourceMap.isEmpty() ? "failed" : "success", remoteDataSourceMap.size());
                 if (!remoteDataSourceMap.isEmpty()) {

@@ -40,6 +40,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -62,9 +63,12 @@ public class DorisSinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
+        log.info("writewritewritewritewrite  ->>>>>>"+element);
         String identifier = Optional.ofNullable(element.getRowIdentifier()).map(RowIdentifier::getIdentifier).orElse(null);
         String fullTableName = ElParseUtil.parseTableFullName(sinkConfig.getTable(), sinkConfig.getTableEl(), identifier);
         SeaTunnelRowType dataType = seaTunnelRowTypeMap.get(fullTableName);
+        if (Objects.isNull(dataType))
+            log.error("get seaTunnelRowTypeMap empty. identifier:{}, fullTableName:{} ,seaTunnelRowTypeMap:{}", identifier, fullTableName, seaTunnelRowTypeMap);
         SerializationSchema serializer = createSerializer(sinkConfig, dataType);
         String record = new String(serializer.serialize(element));
         manager.write(new Record(identifier, fullTableName, record));

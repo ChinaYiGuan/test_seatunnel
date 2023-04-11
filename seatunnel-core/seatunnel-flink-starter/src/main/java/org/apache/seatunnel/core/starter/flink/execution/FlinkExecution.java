@@ -132,7 +132,7 @@ public class FlinkExecution implements TaskExecution {
         for (URL jarUrl : jars) {
             if (new File(jarUrl.getFile()).exists()) {
                 validJars.add(jarUrl);
-                log.info("Inject jar to config: {}. path:{}", jarUrl, path);
+                log.debug("Inject jar to config: {}. path:{}", jarUrl, path);
             } else {
                 log.warn("Remove invalid jar when inject jars into config: {}", jarUrl);
             }

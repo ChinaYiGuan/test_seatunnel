@@ -27,7 +27,13 @@ public class ElParseUtil {
     }
 
     public static String parseTableFullName(String tab, String tabEl, String identifier) {
-        return StringUtils.isNotBlank(tab) ? tab : StringUtils.isNotBlank(tabEl) ? ElParseUtil.parse(tabEl, Collections.singletonMap("identifier", identifier)) : tabEl;
+        if (StringUtils.isNotBlank(tab)) {
+            return tab;
+        }
+        if (StringUtils.isNotBlank(tabEl)) {
+            return StringUtils.isNotBlank(identifier) ? ElParseUtil.parse(tabEl, Collections.singletonMap("identifier", identifier)) : identifier;
+        }
+        return tabEl;
     }
 
     public static void main(String[] args) {

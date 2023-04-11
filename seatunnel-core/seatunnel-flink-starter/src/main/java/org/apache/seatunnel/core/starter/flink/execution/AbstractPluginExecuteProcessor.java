@@ -17,27 +17,27 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
-import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
-
+import lombok.extern.slf4j.Slf4j;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.datasource.BaseDataSource;
 import org.apache.seatunnel.core.starter.flink.config.FlinkCommon;
 import org.apache.seatunnel.flink.FlinkEnvironment;
 import org.apache.seatunnel.flink.util.TableUtil;
-
 import org.apache.seatunnel.plugin.discovery.seatunnel.SeaTunnelDataSourcePluginDiscovery;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
-
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.types.Row;
 
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
+import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
+
+@Slf4j
 public abstract class AbstractPluginExecuteProcessor<T> implements PluginExecuteProcessor {
 
     protected FlinkEnvironment flinkEnvironment;
@@ -55,9 +55,10 @@ public abstract class AbstractPluginExecuteProcessor<T> implements PluginExecute
         this.plugins = initializePlugins(jarPaths, this.pluginConfigs);
     }
 
-    private List<? extends Config> tsf(List<? extends Config> inputPluginConfigs){
+    private List<? extends Config> tsf(List<? extends Config> inputPluginConfigs) {
         SeaTunnelDataSourcePluginDiscovery seaTunnelDataSourcePluginDiscovery = new SeaTunnelDataSourcePluginDiscovery(FlinkCommon.ADD_URL_TO_CLASSLOADER);
         BaseDataSource baseDataSource = seaTunnelDataSourcePluginDiscovery.discovery(null);
+        log.info("Discovered using BaseDataSource conversion plugin: :{}", baseDataSource.getPluginName());
         return baseDataSource.convertCfgs(inputPluginConfigs);
     }
 

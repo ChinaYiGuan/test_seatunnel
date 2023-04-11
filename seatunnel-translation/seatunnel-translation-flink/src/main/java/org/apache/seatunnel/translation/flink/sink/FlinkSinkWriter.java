@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.translation.flink.sink;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -35,6 +36,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<InputT, CommitWrapper<CommT>, FlinkWriterState<WriterStateT>> {
 
     private final org.apache.seatunnel.api.sink.SinkWriter<SeaTunnelRow, CommT, WriterStateT> sinkWriter;
@@ -53,6 +55,7 @@ public class FlinkSinkWriter<InputT, CommT, WriterStateT> implements SinkWriter<
         SeaTunnelSink<SeaTunnelRow, ?, ?, ?> sinkStatisticsPlugin = sinkStatistics.getPlugin();
         SeaTunnelDataType<SeaTunnelRow> dataType = sinkStatisticsPlugin.getConsumedType();
         Function<String, SeaTunnelDataType<?>> dataTypeFun = sinkStatisticsPlugin::getDynamicRowType;
+        log.info("FlinkSinkWriterFlinkSinkWriterFlinkSinkWriterFlinkSinkWriter"+sinkStatisticsPlugin+" "+dataTypeFun);
         this.rowSerialization = new FlinkRowConverter(new DataTypeInfo(true, dataType, dataTypeFun));
     }
 

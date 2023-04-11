@@ -105,11 +105,11 @@ public class DorisSinkManager {
         if (batchList.isEmpty()) {
             return;
         }
-        Map<String, List<Record>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(Record::getFullTableName));
-
-        for (Iterator<Map.Entry<String, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, List<Record>> entry = it.next();
-            String fullTableName = entry.getKey();
+        Map<Optional<String>, List<Record>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(x -> Optional.ofNullable(x.getFullTableName())));
+        log.info("groupBatchMapgroupBatchMapgroupBatchMapgroupBatchMap  ->>>>>>"+groupBatchMap);
+        for (Iterator<Map.Entry<Optional<String>, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<Optional<String>, List<Record>> entry = it.next();
+            String fullTableName = entry.getKey().orElse(null);
             List<Record> groupList = entry.getValue();
             if (StringUtils.isBlank(fullTableName) || CollectionUtils.isEmpty(groupList)) continue;
             String label = createBatchLabel(fullTableName);
@@ -128,8 +128,10 @@ public class DorisSinkManager {
                     groupList
             );
 
+            log.info("sinkConfigsinkConfigsinkConfig  ->>>>>>"+sinkConfig);
             for (int i = 0; i <= sinkConfig.getMaxRetries(); i++) {
                 try {
+                    log.info("tupletupletuple  ->>>>>>"+tuple);
                     Boolean successFlag = dorisStreamLoadVisitor.doStreamLoad(tuple);
                     if (successFlag) {
                         break;

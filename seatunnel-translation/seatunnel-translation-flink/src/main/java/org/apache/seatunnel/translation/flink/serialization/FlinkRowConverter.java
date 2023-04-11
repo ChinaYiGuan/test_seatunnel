@@ -31,11 +31,7 @@ import org.apache.seatunnel.common.dynamic.RowIdentifier;
 import org.apache.seatunnel.translation.serialization.RowConverter;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -63,8 +59,12 @@ public class FlinkRowConverter extends RowConverter<Row> {
         SqlType sqlType = dataType.getSqlType();
         switch (sqlType) {
             case ROW:
-                if (isMultiple) {
-                    return multipleRowConvert((SeaTunnelRow) field, dataTypeFun);
+                try {
+                    if (isMultiple) {
+                        return multipleRowConvert((SeaTunnelRow) field, dataTypeFun);
+                    }
+                } catch (Exception e) {
+                    log.warn("multiple convert err:{}", e.getMessage());
                 }
                 SeaTunnelRow seaTunnelRow = (SeaTunnelRow) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
@@ -116,8 +116,13 @@ public class FlinkRowConverter extends RowConverter<Row> {
             case ROW:
                 Row engineRow = (Row) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
-                if (isMultiple && engineRow.getArity() == 1 && engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY) != null) {
-                    return multipleRowReconvert((Row) field, dataTypeFun);
+                try {
+                    log.info("SeaTunnelRowTypeSeaTunnelRowTypeSeaTunnelRowType "+isMultiple+" "+engineRow +" "+ engineRow.getFieldNames(true)+" "+engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY));
+                    if (isMultiple && engineRow.getArity() == 1 && Objects.requireNonNull(engineRow.getFieldNames(true)).contains(SourceDynamicRowType.DYNAMIC_ROW_KEY) && engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY) != null) {
+                        return multipleRowReconvert((Row) field, dataTypeFun);
+                    }
+                } catch (Exception e) {
+                    log.warn("multiple reconvert err:{}", e.getMessage());
                 }
                 int arity = rowType.getTotalFields();
                 SeaTunnelRow seaTunnelRow = new SeaTunnelRow(arity);
@@ -165,6 +170,7 @@ public class FlinkRowConverter extends RowConverter<Row> {
 
     private SeaTunnelRow multipleRowReconvert(Row engineRow, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
         Object tsfDataJson = engineRow.getField(0);
+        log.info("f00000 "+ tsfDataJson);
         if (tsfDataJson == null)
             throw new RuntimeException("multiple row reconvert, conversion data is empty.");
         TsfData tsfData = JSON.parseObject(tsfDataJson.toString(), TsfData.class, JSONReader.Feature.SupportClassForName);
@@ -178,6 +184,7 @@ public class FlinkRowConverter extends RowConverter<Row> {
             throw new RuntimeException("multiple row reconvert, missing identifier.");
         List<TsfData.Data> dataList = tsfData.getData();
         SeaTunnelRowType dynamicDataType = (SeaTunnelRowType) dataTypeFun.apply(identifier);
+        log.info("dataTypeFundataTypeFundataTypeFundataTypeFun"+dataTypeFun+" "+dynamicDataType);
         if (dynamicDataType == null)
             throw new RuntimeException("multiple row reconvert, dynamicDataType is empty.");
         int arity = dynamicDataType.getTotalFields();
@@ -194,8 +201,8 @@ public class FlinkRowConverter extends RowConverter<Row> {
             types.add(data.getType());
         });
 
-        rowIdentifier.getMetaMap().put("names",names);
-        rowIdentifier.getMetaMap().put("types",types);
+        rowIdentifier.getMetaMap().put("names", names);
+        rowIdentifier.getMetaMap().put("types", types);
         seaTunnelRow.setRowIdentifier(rowIdentifier);
         seaTunnelRow.setRowKind(org.apache.seatunnel.api.table.type.RowKind.fromByteValue(engineRow.getKind().toByteValue()));
 

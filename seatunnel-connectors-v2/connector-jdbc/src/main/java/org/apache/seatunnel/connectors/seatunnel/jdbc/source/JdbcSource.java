@@ -125,7 +125,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
 
     private long queryTotalCount(Connection connection, String sqlTemplate, String partitionCol, Object min, Object max) {
         long total = 0;
-        String sql = String.format("SELECT COUNT(*) FROM ( %s ) T1 WHERE ( %s >= %s AND %s <= %s ) OR %s IS NULL", sqlTemplate, partitionCol,
+        String sql = String.format("SELECT COUNT(*) FROM ( %s ) T1 WHERE ( %s >= %s AND %s <= %s ) OR ( %s IS NULL )", sqlTemplate, partitionCol,
                 min instanceof Long ? min : String.format("'%s'", min.toString()),
                 partitionCol,
                 max instanceof Long ? max : String.format("'%s'", max.toString()),
@@ -138,7 +138,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        LOG.info("queryTotalCount sql:{}. total:{}", sql, total);
+        LOG.info("queryTotalCount sql:{} -> total:{}", sql, total);
         return total;
     }
 
@@ -168,7 +168,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                 try (ResultSet rs = connection.createStatement().executeQuery(sql)) {
                     if (rs.next()) {
                         Object end = rs.getObject(1);
-                        LOG.info("buildPageBetween sql:{}. start:{}. end:{}", sql, start, end);
+                        LOG.info("buildPageBetween sql:{} -> start:{}. end:{}", sql, start, end);
                         if (end == null) continue;
                         pages.add(new Object[]{start, end});
                         start = end;
@@ -309,8 +309,10 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                             rs.getObject(2);
                 }
             }
-            LOG.info("jdbc source init query max min partition sql:{}. min:{}. max:{}", maxMinQuery, min, max);
+            LOG.info("jdbc source init query max min partition sql:{} -> min:{}. max:{}", maxMinQuery, min, max);
         }
+        if (Objects.isNull(max)) max = 0;
+        if (Objects.isNull(min)) min = 0;
         if (isNumericType(partitionColumnType)) {
             long maxVal = Long.parseLong(max.toString());
             long minVal = Long.parseLong(min.toString());

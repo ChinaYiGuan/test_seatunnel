@@ -30,6 +30,7 @@
     <properties>
         <flink.scope>compile</flink.scope>
         <mock-webserver.version>3.6.0</mock-webserver.version>
+        <dept.scope>provided</dept.scope>
     </properties>
 
     <dependencies>
@@ -60,11 +61,13 @@
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-fake</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-console</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <!--   seatunnel connectors  inner -->
         <!--flink-->
@@ -115,6 +118,7 @@
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>datasource-dolphinscheduler</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
 
         <!--   seatunnel-connector other  -->
@@ -122,21 +126,25 @@
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-jdbc</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-cdc-mysql</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-doris</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-file-hadoop</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
 
         <!--        <dependency>-->
@@ -161,6 +169,7 @@
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-hive</artifactId>
             <version>${project.version}</version>
+            <scope>${dept.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
@@ -186,6 +195,10 @@
                 <exclusion>
                     <artifactId>*</artifactId>
                     <groupId>org.apache.curator</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>javax.servlet.jsp</artifactId>
+                    <groupId>org.glassfish.web</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
