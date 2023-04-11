@@ -108,7 +108,6 @@ public class DorisSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     @Override
     public SeaTunnelDataType<SeaTunnelRow> getDynamicRowType(String identifier) {
         String tableFullName = ElParseUtil.parseTableFullName(tab, tabEl, identifier);
-        log.info("getDynamicRowTypegetDynamicRowTypegetDynamicRowType  ->>>>>>"+identifier+" "+tab+" "+tabEl+" "+tableFullName);
         return tsfTypes.computeIfAbsent(tableFullName, x1 -> {
             SchemaResp schemaResp = restUtil.querySchema(tableFullName);
             if (schemaResp != null && schemaResp.getProperties() != null) {

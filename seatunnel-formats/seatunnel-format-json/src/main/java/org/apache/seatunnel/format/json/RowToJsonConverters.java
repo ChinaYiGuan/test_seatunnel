@@ -147,14 +147,22 @@ public class RowToJsonConverters implements Serializable {
                 return new RowToJsonConverter() {
                     @Override
                     public JsonNode convert(ObjectMapper mapper, JsonNode reuse, Object value) {
-                        return mapper.getNodeFactory().textNode(ISO_LOCAL_DATE.format((LocalDate) value));
+                        try {
+                            return mapper.getNodeFactory().textNode(ISO_LOCAL_DATE.format((LocalDate) value));
+                        } catch (Exception e) {
+                            return mapper.getNodeFactory().textNode(value.toString());
+                        }
                     }
                 };
             case TIME:
                 return new RowToJsonConverter() {
                     @Override
                     public JsonNode convert(ObjectMapper mapper, JsonNode reuse, Object value) {
-                        return mapper.getNodeFactory().textNode(TimeFormat.TIME_FORMAT.format((LocalTime) value));
+                        try {
+                            return mapper.getNodeFactory().textNode(TimeFormat.TIME_FORMAT.format((LocalTime) value));
+                        } catch (Exception e) {
+                            return mapper.getNodeFactory().textNode(value.toString());
+                        }
                     }
                 };
             case TIMESTAMP:
