@@ -106,7 +106,6 @@ public class DorisSinkManager {
             return;
         }
         Map<Optional<String>, List<Record>> groupBatchMap = batchList.stream().collect(Collectors.groupingBy(x -> Optional.ofNullable(x.getFullTableName())));
-        log.info("groupBatchMapgroupBatchMapgroupBatchMapgroupBatchMap  ->>>>>>"+groupBatchMap);
         for (Iterator<Map.Entry<Optional<String>, List<Record>>> it = groupBatchMap.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<Optional<String>, List<Record>> entry = it.next();
             String fullTableName = entry.getKey().orElse(null);
@@ -128,10 +127,8 @@ public class DorisSinkManager {
                     groupList
             );
 
-            log.info("sinkConfigsinkConfigsinkConfig  ->>>>>>"+sinkConfig);
             for (int i = 0; i <= sinkConfig.getMaxRetries(); i++) {
                 try {
-                    log.info("tupletupletuple  ->>>>>>"+tuple);
                     Boolean successFlag = dorisStreamLoadVisitor.doStreamLoad(tuple);
                     if (successFlag) {
                         break;
