@@ -145,6 +145,7 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @Override
     public TypeInformation<Row> getProducedType() {
 //        System.err.println(this + " [LOG] -> getProducedType:" + null);
+        LOG.info("source.getDynamicProducedType(source) "+source.getDynamicProducedType(source) +"  "+source);
         return (TypeInformation<Row>) TypeConverterUtils.convert(source.getDynamicProducedType(source));
     }
 

@@ -122,6 +122,7 @@ public class FlinkRowConverter extends RowConverter<Row> {
                         return multipleRowReconvert((Row) field, dataTypeFun);
                     }
                 } catch (Exception e) {
+                    e.printStackTrace();
                     log.warn("multiple reconvert err:{}", e.getMessage());
                 }
                 int arity = rowType.getTotalFields();
