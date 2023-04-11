@@ -63,7 +63,6 @@ public class DorisSinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
-        log.info("writewritewritewritewrite  ->>>>>>"+element);
         String identifier = Optional.ofNullable(element.getRowIdentifier()).map(RowIdentifier::getIdentifier).orElse(null);
         String fullTableName = ElParseUtil.parseTableFullName(sinkConfig.getTable(), sinkConfig.getTableEl(), identifier);
         SeaTunnelRowType dataType = seaTunnelRowTypeMap.get(fullTableName);

@@ -117,12 +117,10 @@ public class FlinkRowConverter extends RowConverter<Row> {
                 Row engineRow = (Row) field;
                 SeaTunnelRowType rowType = (SeaTunnelRowType) dataType;
                 try {
-                    log.info("SeaTunnelRowTypeSeaTunnelRowTypeSeaTunnelRowType "+isMultiple+" "+engineRow +" "+ engineRow.getFieldNames(true)+" "+engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY));
                     if (isMultiple && engineRow.getArity() == 1 && Objects.requireNonNull(engineRow.getFieldNames(true)).contains(SourceDynamicRowType.DYNAMIC_ROW_KEY) && engineRow.getField(SourceDynamicRowType.DYNAMIC_ROW_KEY) != null) {
                         return multipleRowReconvert((Row) field, dataTypeFun);
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
                     log.warn("multiple reconvert err:{}", e.getMessage());
                 }
                 int arity = rowType.getTotalFields();
@@ -171,7 +169,6 @@ public class FlinkRowConverter extends RowConverter<Row> {
 
     private SeaTunnelRow multipleRowReconvert(Row engineRow, Function<String, SeaTunnelDataType<?>> dataTypeFun) {
         Object tsfDataJson = engineRow.getField(0);
-        log.info("f00000 "+ tsfDataJson);
         if (tsfDataJson == null)
             throw new RuntimeException("multiple row reconvert, conversion data is empty.");
         TsfData tsfData = JSON.parseObject(tsfDataJson.toString(), TsfData.class, JSONReader.Feature.SupportClassForName);
@@ -185,7 +182,6 @@ public class FlinkRowConverter extends RowConverter<Row> {
             throw new RuntimeException("multiple row reconvert, missing identifier.");
         List<TsfData.Data> dataList = tsfData.getData();
         SeaTunnelRowType dynamicDataType = (SeaTunnelRowType) dataTypeFun.apply(identifier);
-        log.info("dataTypeFundataTypeFundataTypeFundataTypeFun"+dataTypeFun+" "+dynamicDataType);
         if (dynamicDataType == null)
             throw new RuntimeException("multiple row reconvert, dynamicDataType is empty.");
         int arity = dynamicDataType.getTotalFields();

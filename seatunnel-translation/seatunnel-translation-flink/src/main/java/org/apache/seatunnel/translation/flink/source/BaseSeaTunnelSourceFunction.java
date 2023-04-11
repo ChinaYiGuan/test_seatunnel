@@ -34,7 +34,6 @@ import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.types.Row;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.translation.flink.statistics.SourceStatistics;
@@ -43,7 +42,6 @@ import org.apache.seatunnel.translation.source.BaseSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,7 +143,6 @@ public abstract class BaseSeaTunnelSourceFunction extends RichSourceFunction<Row
     @Override
     public TypeInformation<Row> getProducedType() {
 //        System.err.println(this + " [LOG] -> getProducedType:" + null);
-        LOG.info("source.getDynamicProducedType(source) "+source.getDynamicProducedType(source) +"  "+source);
         return (TypeInformation<Row>) TypeConverterUtils.convert(source.getDynamicProducedType(source));
     }
 
