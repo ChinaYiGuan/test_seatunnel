@@ -51,7 +51,7 @@ public class SeaTunnelApiExample {
         flinkCommandArgs.setConfigFile(configFile);
         flinkCommandArgs.setCheckConfig(false);
 //        flinkCommandArgs.setVariables(null);
-        flinkCommandArgs.setVariables(Arrays.asList("aaa=reason_1t"));
+        flinkCommandArgs.setVariables(Arrays.asList("start_time=reason_1t"));
         Command<FlinkCommandArgs> flinkCommand =
                 new FlinkCommandBuilder().buildCommand(flinkCommandArgs);
         Seatunnel.run(flinkCommand);
