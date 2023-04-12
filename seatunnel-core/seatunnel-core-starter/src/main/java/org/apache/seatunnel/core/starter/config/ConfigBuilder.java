@@ -46,6 +46,10 @@ public class ConfigBuilder {
     private final Config config;
     private final List<String> variables;
 
+    public ConfigBuilder(Path configFile) {
+        this(configFile, null);
+    }
+
     public ConfigBuilder(Path configFile, List<String> variables) {
         this.configFile = configFile;
         this.variables = variables;

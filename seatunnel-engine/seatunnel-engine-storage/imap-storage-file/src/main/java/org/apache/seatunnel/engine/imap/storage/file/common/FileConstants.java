@@ -20,7 +20,6 @@
 
 package org.apache.seatunnel.engine.imap.storage.file.common;
 
-import org.apache.hadoop.conf.Configuration;
 
 public class FileConstants {
 
@@ -28,7 +27,7 @@ public class FileConstants {
 
     public static final String DEFAULT_IMAP_FILE_PATH_SPLIT = "/";
 
-    public static final byte FILE_DATA_DELIMITER =  28;
+    public static final byte FILE_DATA_DELIMITER = 28;
 
     /**
      * init file storage

@@ -44,7 +44,7 @@ public class FlinkApiConfValidateCommand implements Command<FlinkCommandArgs> {
     public void execute() throws ConfigCheckException {
         Path configPath = FileUtils.getConfigPath(flinkCommandArgs);
         // todo: validate the config by new api
-        ConfigBuilder configBuilder = new ConfigBuilder(configPath,null);
+        ConfigBuilder configBuilder = new ConfigBuilder(configPath);
         new FlinkApiConfigChecker().checkConfig(configBuilder.getConfig());
         log.info("config OK !");
     }
