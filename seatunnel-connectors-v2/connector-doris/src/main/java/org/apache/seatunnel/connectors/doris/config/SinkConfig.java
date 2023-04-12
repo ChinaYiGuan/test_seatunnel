@@ -109,6 +109,11 @@ public class SinkConfig {
             .noDefaultValue()
             .withDescription("The amount of time to wait before attempting to retry a request to Doris");
 
+    public static final Option<Boolean> ENABLE_DEBUG_LOG = Options.key("enable.debug_log")
+            .booleanType()
+            .defaultValue(Boolean.FALSE)
+            .withDescription("是否开发日志？");
+
     public enum StreamLoadFormat {
         CSV, JSON;
 
@@ -136,6 +141,7 @@ public class SinkConfig {
     private int maxRetries;
     private int retryBackoffMultiplierMs;
     private int maxRetryBackoffMs;
+    private boolean enableDebugLog = false;
 
     private final Map<String, String> streamLoadProps = new HashMap<>();
 
@@ -175,6 +181,9 @@ public class SinkConfig {
         }
         if (pluginConfig.hasPath(MAX_RETRY_BACKOFF_MS.key())) {
             sinkConfig.setMaxRetryBackoffMs(pluginConfig.getInt(MAX_RETRY_BACKOFF_MS.key()));
+        }
+        if (pluginConfig.hasPath(ENABLE_DEBUG_LOG.key())) {
+            sinkConfig.setEnableDebugLog(pluginConfig.getBoolean(ENABLE_DEBUG_LOG.key()));
         }
         parseSinkStreamLoadProperties(pluginConfig, sinkConfig);
         if (sinkConfig.streamLoadProps.containsKey(COLUMN_SEPARATOR)) {

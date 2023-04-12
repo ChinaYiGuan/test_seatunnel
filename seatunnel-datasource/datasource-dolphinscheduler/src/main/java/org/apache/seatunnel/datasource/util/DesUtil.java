@@ -15,6 +15,8 @@
  */
 package org.apache.seatunnel.datasource.util;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -149,9 +151,19 @@ public class DesUtil {
      * @param args args.
      */
     public static void main(final String[] args) {
-        final String encrypt = DesUtil.getInstance().encrypt("12345678@aB");
-        System.out.println(encrypt);
-        System.out.println(DesUtil.getInstance().decryptor(encrypt));
+        String srcPass = "sELnmJfhwKZe^7FQY";
+        String targetPass = "";
+        if (ArrayUtils.isNotEmpty(args)) {
+            int argsIndex = 0;
+            if (args.length >= 1)
+                srcPass = args[argsIndex++];
+            if (args.length >= 2)
+                targetPass = args[argsIndex++];
+        }
+        final String encrypt = DesUtil.getInstance().encrypt(srcPass);
+        System.out.println(String.format("srcPass:%s, encrypt:%s", srcPass, encrypt));
+        final String decryptor = DesUtil.getInstance().decryptor(targetPass);
+        System.out.println(String.format("targetPass:%s, decryptor:%s", targetPass, decryptor));
     }
 
 

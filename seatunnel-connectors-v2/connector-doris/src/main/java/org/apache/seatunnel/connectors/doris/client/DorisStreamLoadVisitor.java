@@ -61,8 +61,8 @@ public class DorisStreamLoadVisitor {
             throw new DorisConnectorException(CommonErrorCode.ILLEGAL_ARGUMENT, "None of the host in `load_url` could be connected.");
         }
         String loadUrl = String.format("%s/api/%s/%s/_stream_load", host, flushData.getDbName(), flushData.getTableName());
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("Start to join batch data: rows[%d] bytes[%d] label[%s].", flushData.getRows().size(), flushData.getBytes(), flushData.getLabel()));
+        if (log.isDebugEnabled() || sinkConfig.isEnableDebugLog()) {
+            log.info(String.format("Start to join batch data: url:[%s] rows[%d] bytes[%d] label[%s].", loadUrl, flushData.getRows().size(), flushData.getBytes(), flushData.getLabel()));
         }
         Map<String, Object> loadResult = httpHelper.doHttpPut(
                 loadUrl,
@@ -76,8 +76,8 @@ public class DorisStreamLoadVisitor {
         if (null == loadResult || !loadResult.containsKey(keyStatus)) {
             throw new DorisConnectorException(CommonErrorCode.FLUSH_DATA_FAILED, "Unable to flush data to Doris: unknown result status. " + loadResult);
         }
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("StreamLoad response:\n%s", JsonUtils.toJsonString(loadResult)));
+        if (log.isDebugEnabled() || sinkConfig.isEnableDebugLog()) {
+            log.info(String.format("StreamLoad response: %s", JsonUtils.toJsonString(loadResult)));
         }
         if (RESULT_FAILED.equals(loadResult.get(keyStatus))) {
             String errorMsg = "Failed to flush data to Doris.\n";

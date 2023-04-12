@@ -30,7 +30,8 @@
     <properties>
         <flink.scope>compile</flink.scope>
         <mock-webserver.version>3.6.0</mock-webserver.version>
-        <dept.scope>provided</dept.scope>
+        <dept.scope>compile</dept.scope>
+<!--        <dept.scope>provided</dept.scope>-->
     </properties>
 
     <dependencies>

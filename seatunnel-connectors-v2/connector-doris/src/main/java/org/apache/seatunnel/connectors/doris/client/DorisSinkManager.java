@@ -180,7 +180,7 @@ public class DorisSinkManager {
                 String.format("%s-%s-%s-%s",
                         labelPrefix,
                         identifierLab,
-                        DateTimeFormatter.ofPattern("yyyyMMddHHssSSS").format(LocalDateTime.now()),
+                        DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS").format(LocalDateTime.now()),
                         UUID.randomUUID().toString().replaceAll("-", "")
                 ),
                 "-");

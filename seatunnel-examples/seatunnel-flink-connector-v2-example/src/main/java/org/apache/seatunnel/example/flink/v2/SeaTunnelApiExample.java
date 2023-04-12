@@ -27,6 +27,7 @@ import java.io.FileNotFoundException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 public class SeaTunnelApiExample {
 
@@ -39,17 +40,18 @@ public class SeaTunnelApiExample {
 
 //        System.setProperty("dataSourceHost", "http://localhost:12345");
 //        System.setProperty("dataSourceToken", "701761fd7842afa31d14f9ecec5fd5d0");
-        System.setProperty("dataSourceHost", "http://10.192.147.1:12345");
-        System.setProperty("dataSourceToken", "f94d3be770bad18b080def5953564a8d");
+        System.setProperty("dataSourceHost", "http://10.192.112.26:12345");
+        System.setProperty("dataSourceToken", "134f5bf1afe3a721aaa0d3a6ef8d6000");
         System.setProperty("is_show_parseDs", "all");
 
-        String cfgFile = "/examples/uatDoris_to_proDoris-mltiple.conf";
+        String cfgFile = "/examples/example02.conf";
         String configurePath = args.length > 0 ? args[0] : cfgFile;
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setConfigFile(configFile);
         flinkCommandArgs.setCheckConfig(false);
-        flinkCommandArgs.setVariables(null);
+//        flinkCommandArgs.setVariables(null);
+        flinkCommandArgs.setVariables(Arrays.asList("aaa=reason_1t"));
         Command<FlinkCommandArgs> flinkCommand =
                 new FlinkCommandBuilder().buildCommand(flinkCommandArgs);
         Seatunnel.run(flinkCommand);
