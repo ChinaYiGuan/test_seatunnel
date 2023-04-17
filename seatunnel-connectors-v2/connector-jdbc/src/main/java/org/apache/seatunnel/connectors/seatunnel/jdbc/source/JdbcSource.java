@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.source;
 
+import cn.hutool.core.date.DateUtil;
 import com.google.auto.service.AutoService;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -142,6 +143,15 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
         return total;
     }
 
+    private Object fmtQueryRs(Object input) {
+        if (input != null)
+            try {
+                return DateUtil.parse(input.toString()).toString();
+            } catch (Exception e) {
+            }
+        return input;
+    }
+
     private Object[][] buildPageBetween(Connection connection, int pageTotal, String sqlTemplate, String partitionCol, Object min, Object max) {
         List<Object[]> pages = new ArrayList<>();
         try {
@@ -168,6 +178,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                 try (ResultSet rs = connection.createStatement().executeQuery(sql)) {
                     if (rs.next()) {
                         Object end = rs.getObject(1);
+                        end = fmtQueryRs(end);
                         LOG.info("buildPageBetween sql:{} -> start:{}. end:{}", sql, start, end);
                         if (end == null) continue;
                         pages.add(new Object[]{start, end});
@@ -176,6 +187,7 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                 } catch (SQLException e) {
                     throw new RuntimeException(e);
                 }
+
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -305,8 +317,10 @@ public class JdbcSource implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit
                 if (rs.next()) {
                     max = jdbcSourceOpt.getPartitionUpperBound().isPresent() ? jdbcSourceOpt.getPartitionUpperBound().get() :
                             rs.getObject(1);
+                    max = fmtQueryRs(max);
                     min = jdbcSourceOpt.getPartitionLowerBound().isPresent() ? jdbcSourceOpt.getPartitionLowerBound().get() :
                             rs.getObject(2);
+                    min = fmtQueryRs(min);
                 }
             }
             LOG.info("jdbc source init query max min partition sql:{} -> min:{}. max:{}", maxMinQuery, min, max);

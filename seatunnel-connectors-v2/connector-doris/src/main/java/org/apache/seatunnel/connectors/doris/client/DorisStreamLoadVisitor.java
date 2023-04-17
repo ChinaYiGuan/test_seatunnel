@@ -67,7 +67,7 @@ public class DorisStreamLoadVisitor {
         Map<String, Object> loadResult = httpHelper.doHttpPut(
                 loadUrl,
                 joinRows(
-                        flushData.getRows().stream().map(x -> x.getDataJson().getBytes(StandardCharsets.UTF_8)).collect(Collectors.toList()),
+                        flushData.getRows().stream().map(x -> x.getDataJson().getBytes()).collect(Collectors.toList()),
                         flushData.getBytes().intValue()
                 ),
                 getStreamLoadHttpHeader(flushData.getLabel())
@@ -201,16 +201,15 @@ public class DorisStreamLoadVisitor {
 //        if (null != fieldNames && !fieldNames.isEmpty() && SinkConfig.StreamLoadFormat.CSV.equals(sinkConfig.getLoadFormat())) {
 //            headerMap.put("columns", String.join(",", fieldNames.stream().map(f -> String.format("`%s`", f)).collect(Collectors.toList())));
 //        }
+        headerMap.put("strip_outer_array", "true");
+        headerMap.put("Expect", "100-continue");
+        headerMap.put("label", label);
+        headerMap.put("Authorization", getBasicAuthHeader(sinkConfig.getUsername(), sinkConfig.getPassword()));
         if (null != sinkConfig.getStreamLoadProps()) {
             for (Map.Entry<String, String> entry : sinkConfig.getStreamLoadProps().entrySet()) {
                 headerMap.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
         }
-        headerMap.put("strip_outer_array", "true");
-        headerMap.put("Expect", "100-continue");
-        headerMap.put("label", label);
-        headerMap.put("Content-Type", "application/x-www-form-urlencoded");
-        headerMap.put("Authorization", getBasicAuthHeader(sinkConfig.getUsername(), sinkConfig.getPassword()));
         return headerMap;
     }
 

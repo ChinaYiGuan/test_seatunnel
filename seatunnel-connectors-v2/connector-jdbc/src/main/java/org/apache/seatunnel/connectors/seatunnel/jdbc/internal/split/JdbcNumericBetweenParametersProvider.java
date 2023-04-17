@@ -108,8 +108,8 @@ public class JdbcNumericBetweenParametersProvider implements JdbcParameterValues
         long start = minVal;
         for (int i = 0; i < batchNum; i++) {
             long end = start + batchSize - 1 - (i >= bigBatchNum ? 1 : 0);
-            parameters[i] = new Long[] {start, end};
-            start = end + 1;
+            parameters[i] = new Long[] {start, i == batchNum-1 ? end : end+1};
+            start = end+1;
         }
         return parameters;
     }

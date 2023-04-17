@@ -41,6 +41,8 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -91,7 +93,8 @@ public class FlinkExecution implements TaskExecution {
 
         log.info("Flink Execution Plan:{}", flinkEnvironment.getStreamExecutionEnvironment().getExecutionPlan());
         try {
-            flinkEnvironment.getStreamExecutionEnvironment().execute(flinkEnvironment.getJobName());
+            flinkEnvironment.getStreamExecutionEnvironment()
+                    .execute(flinkEnvironment.getJobName() + "[" + DateTimeFormatter.ofPattern("yyyy.MM.dd-HH:mm:ss.SSS").format(LocalDateTime.now()) + "]");
         } catch (Exception e) {
             throw new TaskExecuteException("Execute Flink job error", e);
         }

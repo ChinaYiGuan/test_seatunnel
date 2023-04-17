@@ -43,7 +43,7 @@ public class FlinkStarterTest {
 //        Assertions.assertTrue(flinkExecuteCommand.contains("${FLINK_HOME}/bin/flink run"));
 
 
-        String[] args3 = {"--config", "test.conf", "-r", "run-application", "-i", "key1=value1", "-i", "key2=value2", "--target", "yarn-application"};
+        String[] args3 = {"--config", "test.conf", "-r", "run-application", "-i", "'key1=a1 a2'", "-i", "key2=value2", "--target", "yarn-application"};
         String  flinkExecuteCommand = String.join(" ", new FlinkStarter(args3).buildCommands());
 
         try {

@@ -236,7 +236,7 @@ public class JdbcInputFormat implements Serializable {
                 seaTunnelRow = jdbcRowConverter.toInternal(resultSet, typeInfo);
                 String tab = jdbcSourceCfgMeta.getTable();
                 if (StringUtils.isNotBlank(tab)) {
-                    seaTunnelRow.setRowIdentifier(RowIdentifier.newBuilder().build(jdbcSourceCfgMeta.getDb(),tab));
+                    seaTunnelRow.setRowIdentifier(RowIdentifier.newBuilder().build(jdbcSourceCfgMeta.getDb(), tab));
                 }
                 // update hasNext after we've read the record
                 hasNext = resultSet.next();

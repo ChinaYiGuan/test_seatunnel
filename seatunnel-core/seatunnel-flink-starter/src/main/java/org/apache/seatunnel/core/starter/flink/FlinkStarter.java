@@ -26,6 +26,7 @@ import org.apache.seatunnel.core.starter.utils.CommandLineUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * The SeaTunnel flink starter. This class is responsible for generate the final flink job execute command.
@@ -80,6 +81,13 @@ public class FlinkStarter implements Starter {
                 .filter(Objects::nonNull)
                 .map(String::trim)
                 .forEach(variable -> command.add("-D" + variable));
+        command.add(flinkCommandArgs.getVariables()
+                .stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .map(x -> String.format("-i %s", x))
+                .collect(Collectors.joining(" "))
+        );
         return command;
     }
 

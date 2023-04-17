@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.common.config.ConfigRuntimeException;
+import org.apache.seatunnel.common.utils.EnvUtil;
 import org.apache.seatunnel.common.utils.FileUtils;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
@@ -28,10 +29,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigRenderOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigResolveOptions;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -59,14 +57,19 @@ public class ConfigBuilder {
     private static String parseEL(String input, Map<String, Object> mapMap) {
         String elRegex = "#\\{(.*?)}";
         Pattern pattern = Pattern.compile(elRegex);
+        Map<String, String> noReplaceMap = new HashMap<>();
         String output = input;
         Matcher matcher;
         try {
             while ((matcher = pattern.matcher(output)).find()) {
                 //替换匹配内容
-                String elStr = matcher.group();
-                String k = matcher.group(1);
-                String v = Optional.ofNullable(mapMap.get(k)).map(Object::toString).orElse(elStr);
+                String elStr = matcher.group(); //${key}
+                String k = matcher.group(1); //key
+                String v = Optional.ofNullable(mapMap.get(k)).map(Object::toString).orElseGet(() -> {
+                    String tmpV = UUID.randomUUID().toString();
+                    noReplaceMap.put(elStr, tmpV);
+                    return tmpV;
+                });
                 if (mapMap.containsKey(k)) {
                     log.info("cfg replace variables:【{}】 -> 【{}】", k, v);
                 }
@@ -74,6 +77,9 @@ public class ConfigBuilder {
             }
         } catch (Exception e) {
             log.error("cfg replace err:" + e.getMessage());
+        }
+        for (Map.Entry<String, String> entry : noReplaceMap.entrySet()) {
+            output = output.replace(entry.getValue(), entry.getKey());
         }
         return output;
     }
@@ -89,9 +95,13 @@ public class ConfigBuilder {
         if (CollectionUtils.isNotEmpty(variables)) {
             Map<String, Object> varMap = variables.stream()
                     .filter(StringUtils::isNotBlank)
-                    .filter(x -> x.split("=").length == 2)
+                    .filter(x -> x.split("=").length <= 2)
                     .map(x -> x.split("="))
-                    .collect(HashMap::new, (m, x) -> m.put(x[0], x[1]), Map::putAll);
+                    .collect(
+                            HashMap::new,
+                            (m, x) -> m.put(x[0], x.length >= 2 ? x[1] : EnvUtil.getEnv("variables_default_value", "")),
+                            Map::putAll
+                    );
             cfgStr = parseEL(cfgStr, varMap);
         }
 
